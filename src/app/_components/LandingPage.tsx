@@ -155,12 +155,12 @@ const LandingPage: React.FC = () => {
           >
             <div className="grid h-full grid-cols-12">
               <div className="col-start-1 col-end-6 flex items-center justify-center">
-                <div className="mx-[48px] flex max-w-[28rem] flex-col justify-center">
+                <div className="mx-[48px] flex max-w-[28rem] flex-col justify-center lg:max-w-[40rem]">
                   <div>
-                    <h1 className="text-primary mt-6 text-[3rem] font-medium leading-[1.15] text-gray-800">
+                    <h1 className="mt-6 text-[3rem] font-medium leading-[1.15] text-gray-800 lg:text-[4rem]">
                       Digital operations for the AI era
                     </h1>
-                    <p className="text-secondary mt-2 text-[1.125rem] font-medium leading-[1.35] tracking-[0.01em] text-gray-700 md:text-lg">
+                    <p className="mt-2 text-[1.125rem] font-medium leading-[1.35] tracking-[0.01em] text-gray-700 md:text-lg">
                       Empower the people closest to the work to transform
                       business processes.
                     </p>

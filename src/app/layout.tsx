@@ -1,7 +1,8 @@
 import "~/styles/globals.css";
-
+import { Providers } from "./providers";
 import { GeistSans } from "geist/font/sans";
 import { type Metadata } from "next";
+import { SessionProvider } from "next-auth/react";
 
 import { TRPCReactProvider } from "~/trpc/react";
 
@@ -15,10 +16,14 @@ export default function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="en" className={`${GeistSans.variable}`}>
-      <body>
-        <TRPCReactProvider>{children}</TRPCReactProvider>
-      </body>
-    </html>
+    <Providers>
+      <html lang="en" className={`${GeistSans.variable}`}>
+        <body>
+          <Providers>
+            <TRPCReactProvider>{children}</TRPCReactProvider>
+          </Providers>
+        </body>
+      </html>
+    </Providers>
   );
 }
