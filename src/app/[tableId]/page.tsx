@@ -1,9 +1,14 @@
 import React from "react";
-
-export default async function TablePage({
-  params,
-}: {
-  params: { tableId: string };
-}) {
-  return <div>TablePage</div>;
+import { Navbar } from "~/app/_components/home/navbar";
+interface PageProps {
+  params: Promise<{
+    tableId: string;
+  }>;
+}
+export default function TablePage({ params }: PageProps) {
+  return (
+    <div>
+      <Navbar />
+    </div>
+  );
 }

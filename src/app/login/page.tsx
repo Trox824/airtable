@@ -11,7 +11,7 @@ export default function LoginPage() {
 
   useEffect(() => {
     if (session.status === "authenticated") {
-      router.push("/table");
+      router.push("/");
     }
   }, [session, router]);
 
@@ -111,8 +111,8 @@ export default function LoginPage() {
           Learn More
         </button>
         <div className="mt-10 rounded-lg bg-white p-4 text-gray-700 shadow-md">
-          I need to manage the release of a women's skateboarding shoe in time
-          for the Olympics
+          I need to manage the release of a women&apos;s skateboarding shoe in
+          time for the Olympics
         </div>
       </div>
     </div>

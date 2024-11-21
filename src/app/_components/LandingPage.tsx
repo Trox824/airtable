@@ -1,4 +1,5 @@
 import React from "react";
+import Link from "next/link";
 import bg from "../../../image/bg.png";
 const LandingPage: React.FC = () => {
   return (
@@ -9,7 +10,7 @@ const LandingPage: React.FC = () => {
             Use AI to spin up transformative apps instantly.
           </p>
           <span className="inline-block">
-            <a className="flex items-center" href="/platform/app-building">
+            <Link className="flex items-center" href="/platform/app-building">
               <span className="text-primary ml-2 block text-sm font-medium text-[#1b61c9] transition-colors hover:underline">
                 See it in action
               </span>
@@ -24,11 +25,11 @@ const LandingPage: React.FC = () => {
                   fill="#1b61c9"
                 ></path>
               </svg>
-            </a>
+            </Link>
           </span>
         </div>
         <nav className="col-span-2 col-start-1 row-start-2 grid grid-cols-[auto,1fr] gap-8 px-[32px]">
-          <a className="my-5 flex" href="/">
+          <Link className="my-5 flex" href="/">
             <div className="h-8">
               <svg
                 xmlns="http://www.w3.org/2000/svg"
@@ -69,7 +70,7 @@ const LandingPage: React.FC = () => {
                 ></path>
               </svg>
             </div>
-          </a>
+          </Link>
           <div className="hidden space-x-6 md:flex">
             <button className="hover:text-primary flex items-center font-medium transition">
               Platform
@@ -128,18 +129,18 @@ const LandingPage: React.FC = () => {
           <button className="hover:bg-primary-hover border-box rounded-[8px] border-2 px-[10px] py-[3px] text-[1rem] font-medium text-black">
             Contact Sales
           </button>
-          <a
+          <Link
             className="bg-primary shadow-at-btn-shadow-secondary hover:bg-primary-hover ml-4 rounded-[8px] bg-[#1b61c9] px-[10px] py-[3px] text-[1rem] font-medium text-white"
             href="/signup"
           >
             Sign up for free
-          </a>
-          <a
+          </Link>
+          <Link
             className="hover:text-primary ml-4 hidden text-[1rem] font-medium transition md:block"
             href="/login"
           >
             Sign in
-          </a>
+          </Link>
         </div>
       </header>
       <main className="h-screen w-full">
