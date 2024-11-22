@@ -1,6 +1,14 @@
 import Link from "next/link";
+import { type Base } from "@prisma/client";
 
-export function Navbar() {
+interface NavbarProps {
+  currentBase: Base;
+  allBases: Base[];
+}
+
+export function Navbar({ currentBase, allBases }: NavbarProps) {
+  const baseName = currentBase?.name ?? "Loading...";
+
   return (
     <header className="left-0 right-0 top-0 flex h-14 flex-col bg-teal-500 pl-5 pr-4 text-white">
       <div className="flex flex-1">
@@ -34,58 +42,28 @@ export function Navbar() {
           </div>
           <div className="group group-hover:opacity-100"></div>
           <div className="flex flex-row items-center">
-            <Link
-              id="appTopBarHomeButton"
-              aria-label="Go home"
-              className="mr2 circle focus-visible-white border-darken3 relative flex flex-none"
-              href="/"
-              style={{ width: "24px", height: "24px" }}
-            >
-              <div
-                className="animate flex flex-auto items-center justify-center"
-                style={{ transform: "scale(1)" }}
-              ></div>
-              <div className="animate redDusty circle invisible absolute">
-                <div
-                  className="circle flex items-center justify-center"
-                  style={{
-                    width: "24px",
-                    height: "24px",
-                    background: "var(--palette-neutral-white)",
-                  }}
-                >
-                  <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-                    <path
-                      fillRule="evenodd"
-                      d="M5.64775 2.22725C5.86742 2.44692 5.86742 2.80308 5.64775 3.02275L3.233 5.4375H10.125C10.4357 5.4375 10.6875 5.68934 10.6875 6C10.6875 6.31066 10.4357 6.5625 10.125 6.5625H3.233L5.64775 8.97725C5.86742 9.19692 5.86742 9.55308 5.64775 9.77275C5.42808 9.99242 5.07192 9.99242 4.85225 9.77275L1.47725 6.39775C1.37176 6.29226 1.3125 6.14918 1.3125 6C1.3125 5.85082 1.37176 5.70774 1.47725 5.60225L4.85225 2.22725C5.07192 2.00758 5.42808 2.00758 5.64775 2.22725Z"
-                      fill="#99455a"
-                    ></path>
-                  </svg>
-                </div>
-              </div>
-            </Link>
-            <span className="mr-1 text-[17px] font-semibold">Base 1</span>
+            <span className="mr-1 text-[17px] font-semibold">{baseName}</span>
             <svg
               width="16"
               height="16"
               viewBox="0 0 16 16"
               className="icon fill-at-half-black/70 flex-none"
             >
-              <use
+              <path
                 fill="currentColor"
-                href="/icons/icon_definitions.svg#ChevronDown"
+                d="M4 6l4 4 4-4H4z" // Down arrow path
               />
             </svg>
           </div>
         </div>
 
         {/* Navigation Links */}
-        <nav className="flex items-center px-4">
+        <nav className="flex items-center px-[15px]">
           <div className="flex h-auto flex-row">
             {["Data", "Automations", "Interfaces"].map((item) => (
               <div
                 key={item}
-                className="mr-2 flex h-7 cursor-pointer flex-row items-center rounded-full px-3 text-black/65 hover:bg-black/10"
+                className="mr-[8px] flex h-7 cursor-pointer flex-row items-center rounded-full px-3 text-black/65 hover:bg-black/10"
               >
                 <Link className="flex items-center" href="/">
                   <p className="text-[13px] text-white">{item}</p>
@@ -93,9 +71,9 @@ export function Navbar() {
               </div>
             ))}
           </div>
-          <div className="mr-3 h-5 border-l-[0.8px] border-white/10" />
+          <div className="ml-[3px] h-5 border-r-[1px] border-white/10" />
           <div>
-            <div className="mr-2 flex h-7 cursor-pointer flex-row items-center rounded-full px-3 text-black/65 hover:bg-black/10">
+            <div className="mr-2 flex h-7 cursor-pointer flex-row items-center rounded-full px-6 text-black/65 hover:bg-black/10">
               <Link className="flex items-center" href="/">
                 <p className="text-[13px] text-white">Forms</p>
               </Link>
@@ -113,9 +91,9 @@ export function Navbar() {
               viewBox="0 0 16 16"
               className="icon flex-none"
             >
-              <use
+              <path
                 fill="#FFFFFF"
-                href="/icons/icon_definitions.svg#ClockCounterClockwise"
+                d="M8 0C3.6 0 0 3.6 0 8s3.6 8 8 8 8-3.6 8-8-3.6-8-8-8zm0 14c-3.3 0-6-2.7-6-6s2.7-6 6-6 6 2.7 6 6-2.7 6-6 6zm0-10c-1.4 0-2.5 1.1-2.5 2.5h1.5c0-.6.4-1 1-1s1 .4 1 1c0 1-1.5 1.5-1.5 2.5v.5h1.5v-.5c0-.5 1.5-1 1.5-2.5 0-1.4-1.1-2.5-2.5-2.5zM7.3 11h1.5v-1.5H7.3z"
               />
             </svg>
           </div>
@@ -126,35 +104,58 @@ export function Navbar() {
               viewBox="0 0 16 16"
               className="icon flex-none"
             >
-              <use fill="#FFFFFF" href="/icons/icon_definitions.svg#Question" />
+              <path
+                fill="#FFFFFF"
+                d="M8 0L2.5 9h11L8 0zm0 3.98L10.76 8H5.24L8 3.98zM2.5 11v2h11v-2h-11z"
+              />
             </svg>
-            <span className="ml-1 rounded-2xl bg-white px-2 py-1 text-[13px] text-black shadow">
-              Share
-            </span>
+          </div>
+          <div className="flex h-7 cursor-pointer flex-row items-center rounded-full px-3 text-black/65 hover:bg-black/10">
             <svg
               width="16"
               height="16"
               viewBox="0 0 16 16"
-              className="text-red-dusty ml-1 flex-none"
-              style={{ shapeRendering: "geometricPrecision" }}
+              className="icon flex-none"
             >
-              <use
-                fill="currentColor"
-                href="/icons/icon_definitions.svg#Users"
+              <path
+                fill="#FFFFFF"
+                d="M8 1.5a6.5 6.5 0 1 0 0 13 6.5 6.5 0 0 0 0-13zM0 8a8 8 0 1 1 16 0A8 8 0 0 1 0 8zm7.25-4v4.5l3.5 2-0.75 1.25-4-2.25V4h1.25z"
               />
             </svg>
           </div>
-          <div className="shadow-at-main-nav mx-3 flex h-7 items-center rounded-full bg-white">
+          <div className="flex h-7 cursor-pointer flex-row items-center text-black/65">
+            <span className="mr-2 flex items-center rounded-2xl bg-white px-3 py-1 text-[13px] text-teal-500 shadow">
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className="flex-none"
+              >
+                <path d="M18 20c0-3.37-2-6.5-4-8a5 5 0 0 0-.45-8.3"></path>
+                <circle cx="10" cy="8" r="5"></circle>
+                <path d="M22 20c0-3.37-2-6.5-4-8a5 5 0 0 0-.45-8.3"></path>
+              </svg>
+              Share
+            </span>
+          </div>
+          <div className="mx-[7px] flex h-7 items-center rounded-full bg-white">
             <div className="flex w-7 cursor-pointer items-center justify-center text-black/65">
               <svg
                 width="16"
                 height="16"
                 viewBox="0 0 16 16"
                 className="flex-none"
+                style={{ shapeRendering: "geometricPrecision" }}
               >
-                <use
+                <path
                   fill="currentColor"
-                  href="/icons/icon_definitions.svg#Bell"
+                  d="M8 16c1.1 0 2-.9 2-2H6c0 1.1.9 2 2 2zm6-5c-.55 0-1-.45-1-1V6c0-2.76-2.24-5-5-5S3 3.24 3 6v4c0 .55-.45 1-1 1s-1 .45-1 1 .45 1 1 1h12c.55 0 1-.45 1-1s-.45-1-1-1z"
                 />
               </svg>
             </div>

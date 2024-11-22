@@ -42,6 +42,7 @@ const HomePage: React.FC = () => {
         );
       }
       void queryClient.invalidateQueries({ queryKey: ["base.getAll"] });
+      router.push(`/${created.id}`);
     },
     onError: (_, __, context) => {
       if (context?.tempBase) {
@@ -76,6 +77,7 @@ const HomePage: React.FC = () => {
     e.preventDefault();
     if (newBaseName.trim()) {
       createBase.mutate({ name: newBaseName });
+      router.push("/loading");
     }
   };
 
@@ -403,32 +405,30 @@ const HomePage: React.FC = () => {
           </div>
 
           {/* Base Grid */}
-          <div className="grid-auto-flow-col grid w-full grid-cols-4 gap-4">
+          <div className="grid w-full grid-cols-4 gap-4">
             {isLoading ? (
-              <div className="flex items-center justify-center">
-                <svg
-                  className="h-5 w-5 animate-spin text-blue-500"
-                  xmlns="http://www.w3.org/2000/svg"
-                  viewBox="0 0 24 24"
-                >
-                  <circle
-                    className="opacity-25"
-                    cx="12"
-                    cy="12"
-                    r="10"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="4"
-                  />
-                  <path
-                    className="opacity-75"
-                    fill="currentColor"
-                    d="M4 12a8 8 0 1 1 16 0A8 8 0 0 1 4 12z"
-                  />
-                </svg>
-                <span className="ml-2 text-gray-500">Loading bases...</span>
-              </div>
+              // Loading skeletons
+              <>
+                {[1, 2, 3].map((i) => (
+                  <div
+                    key={i}
+                    className="shadow-at-main-nav h-24 rounded-md border bg-white p-4"
+                  >
+                    <div className="flex h-full w-full animate-pulse items-center">
+                      {/* Skeleton Icon */}
+                      <div className="mr-4 flex h-14 w-14 items-center justify-center rounded-lg bg-gray-200"></div>
+
+                      {/* Skeleton Text */}
+                      <div className="flex flex-col space-y-2">
+                        <div className="h-3.5 w-32 rounded bg-gray-200"></div>
+                        <div className="h-3 w-16 rounded bg-gray-200"></div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </>
             ) : (
+              // Actual base items
               localBases?.map((base) => (
                 <div key={base.id} className="group relative">
                   <Link href={`/${base.id}`}>

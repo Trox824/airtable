@@ -21,11 +21,24 @@ export const baseRouter = createTRPCRouter({
         });
       }
 
-      return ctx.db.base.create({
-        data: {
-          name: input.name,
-          userId: session.user.id,
-        },
+      // Create base and initial table in a transaction
+      return ctx.db.$transaction(async (tx) => {
+        const base = await tx.base.create({
+          data: {
+            name: input.name,
+            userId: session.user.id,
+          },
+        });
+
+        // Create initial table
+        await tx.table.create({
+          data: {
+            name: "Table 1",
+            baseId: base.id,
+          },
+        });
+
+        return base;
       });
     }),
 
