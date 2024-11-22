@@ -46,4 +46,37 @@ export const baseRouter = createTRPCRouter({
       },
     });
   }),
+
+  delete: publicProcedure
+    .input(
+      z.object({
+        id: z.string(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      // Ensure user is authenticated
+      const session = await getServerSession(authOptions);
+      if (!session) {
+        throw new TRPCError({
+          code: "UNAUTHORIZED",
+          message: "You must be logged in to delete a base",
+        });
+      }
+
+      // Check if the base belongs to the user
+      const base = await ctx.db.base.findUnique({
+        where: { id: input.id },
+      });
+
+      if (!base || base.userId !== session.user.id) {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "You do not have permission to delete this base",
+        });
+      }
+
+      return ctx.db.base.delete({
+        where: { id: input.id },
+      });
+    }),
 });

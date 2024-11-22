@@ -2,26 +2,75 @@ import Link from "next/link";
 import React, { useState, useEffect } from "react";
 import { api } from "~/trpc/react";
 import { useRouter } from "next/navigation";
-
+import { useQueryClient } from "@tanstack/react-query";
+import { Base } from "@prisma/client";
 const HomePage: React.FC = () => {
   const [isCreating, setIsCreating] = useState(false);
   const [newBaseName, setNewBaseName] = useState("");
+  const [localBases, setLocalBases] = useState<Base[]>([]);
   const router = useRouter();
-  const { data: bases, isLoading, error } = api.base.getAll.useQuery();
+  const queryClient = useQueryClient();
+
+  const { isLoading, error, data } = api.base.getAll.useQuery();
+
+  useEffect(() => {
+    if (data) {
+      setLocalBases(data);
+    }
+  }, [data]);
+
+  const createBase = api.base.create.useMutation({
+    onMutate: async (newBase) => {
+      const tempBase: Base = {
+        id: `temp-${Date.now()}`,
+        name: newBase.name,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        userId: "temp",
+      };
+      setLocalBases((prev) => [...prev, tempBase]);
+      setIsCreating(false);
+      setNewBaseName("");
+      return { tempBase };
+    },
+    onSuccess: (created, _, context) => {
+      if (context?.tempBase) {
+        setLocalBases((prev) =>
+          prev.map((base) =>
+            base.id === context.tempBase.id ? created : base,
+          ),
+        );
+      }
+      void queryClient.invalidateQueries({ queryKey: ["base.getAll"] });
+    },
+    onError: (_, __, context) => {
+      if (context?.tempBase) {
+        setLocalBases((prev) =>
+          prev.filter((base) => base.id !== context.tempBase.id),
+        );
+      }
+    },
+  });
+
+  const deleteBase = api.base.delete.useMutation({
+    onMutate: async (deletedBase) => {
+      setLocalBases((prev) =>
+        prev.filter((base) => base.id !== deletedBase.id),
+      );
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["base.getAll"] });
+    },
+    onError: () => {
+      void queryClient.invalidateQueries({ queryKey: ["base.getAll"] });
+    },
+  });
 
   useEffect(() => {
     if (error) {
       console.error("Error fetching bases:", error);
     }
   }, [error]);
-
-  const createBase = api.base.create.useMutation({
-    onSuccess: () => {
-      setIsCreating(false);
-      setNewBaseName("");
-      router.refresh();
-    },
-  });
 
   const handleCreateBase = (e: React.FormEvent) => {
     e.preventDefault();
@@ -356,32 +405,78 @@ const HomePage: React.FC = () => {
           {/* Base Grid */}
           <div className="grid-auto-flow-col grid w-full grid-cols-4 gap-4">
             {isLoading ? (
-              <div>Loading...</div>
+              <div className="flex items-center justify-center">
+                <svg
+                  className="h-5 w-5 animate-spin text-blue-500"
+                  xmlns="http://www.w3.org/2000/svg"
+                  viewBox="0 0 24 24"
+                >
+                  <circle
+                    className="opacity-25"
+                    cx="12"
+                    cy="12"
+                    r="10"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="4"
+                  />
+                  <path
+                    className="opacity-75"
+                    fill="currentColor"
+                    d="M4 12a8 8 0 1 1 16 0A8 8 0 0 1 4 12z"
+                  />
+                </svg>
+                <span className="ml-2 text-gray-500">Loading bases...</span>
+              </div>
             ) : (
-              bases?.map((base) => (
-                <Link key={base.id} href={`/${base.id}`}>
-                  <div className="shadow-at-main-nav hover:shadow-at-main-nav-hover mt-1 h-24 rounded-md border bg-white p-4">
-                    <div className="flex h-full w-full items-center">
-                      <div className="mr-4 flex h-14 w-14 items-center justify-center rounded-lg bg-teal-500">
-                        <svg
-                          width="24"
-                          height="24"
-                          viewBox="0 0 16 16"
-                          className="undefined"
-                        >
-                          <use
-                            fill="currentColor"
-                            href="/icons/icon_definitions.svg?v=4ff0794f56fc1e06fa1e614b25254a46#RocketLaunch"
-                          ></use>
-                        </svg>
-                      </div>
-                      <div className="">
-                        <p className="text-[13px] font-medium">{base.name}</p>
-                        <p className="mt-2 text-[11px] text-[#666]">Base</p>
+              localBases?.map((base) => (
+                <div key={base.id} className="group relative">
+                  <Link href={`/${base.id}`}>
+                    <div className="shadow-at-main-nav hover:shadow-at-main-nav-hover mt-1 h-24 rounded-md border bg-white p-4">
+                      <div className="flex h-full w-full items-center">
+                        <div className="mr-4 flex h-14 w-14 items-center justify-center rounded-lg bg-teal-500">
+                          <svg
+                            width="24"
+                            height="24"
+                            viewBox="0 0 16 16"
+                            className="undefined"
+                          >
+                            <use
+                              fill="currentColor"
+                              href="/icons/icon_definitions.svg?v=4ff0794f56fc1e06fa1e614b25254a46#RocketLaunch"
+                            ></use>
+                          </svg>
+                        </div>
+                        <div className="">
+                          <p className="text-[13px] font-medium">{base.name}</p>
+                          <p className="mt-2 text-[11px] text-[#666]">Base</p>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                </Link>
+                  </Link>
+                  {/* Delete Button */}
+                  <button
+                    className="absolute right-0 top-1/2 mr-2 flex h-8 w-10 w-6 -translate-y-1/2 items-center justify-center rounded-md bg-black/5 opacity-0 transition-all duration-200 hover:bg-red-500 group-hover:opacity-100"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      deleteBase.mutate({ id: base.id });
+                    }}
+                  >
+                    <svg
+                      width="12"
+                      height="12"
+                      viewBox="0 0 16 16"
+                      className="text-black/40 transition-colors duration-200 hover:text-white"
+                    >
+                      <path
+                        d="M4 4L12 12M12 4L4 12"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                      />
+                    </svg>
+                  </button>
+                </div>
               ))
             )}
 
@@ -446,15 +541,6 @@ const HomePage: React.FC = () => {
             </div>
           </div>
         </div>
-      </div>
-
-      {/* Display Bases */}
-      <div>
-        {isLoading ? (
-          <p>Loading bases...</p>
-        ) : (
-          <ul>{bases?.map((base) => <li key={base.id}>{base.name}</li>)}</ul>
-        )}
       </div>
     </div>
   );
