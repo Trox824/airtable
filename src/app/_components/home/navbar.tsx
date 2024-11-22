@@ -31,7 +31,7 @@ export function Navbar() {
           </div>
           <div className="group group-hover:opacity-100"></div>
           <div className="flex flex-row items-center">
-            <a
+            <Link
               id="appTopBarHomeButton"
               aria-label="Go home"
               className="mr2 circle focus-visible-white border-darken3 relative flex flex-none"
@@ -60,7 +60,7 @@ export function Navbar() {
                   </svg>
                 </div>
               </div>
-            </a>
+            </Link>
             <span className="mr-1 text-[17px] font-semibold">Base 1</span>
             <svg
               width="16"
