@@ -8,6 +8,10 @@ export default {
       fontFamily: {
         sans: ["var(--font-geist-sans)", ...fontFamily.sans],
       },
+      spacing: {
+        navbar: "56px",
+        toolbar: "48px",
+      },
     },
   },
   plugins: [require("tailwind-scrollbar-hide")],

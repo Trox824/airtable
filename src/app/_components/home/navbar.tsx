@@ -10,7 +10,7 @@ export function Navbar({ currentBase, allBases }: NavbarProps) {
   const baseName = currentBase?.name ?? "Loading...";
 
   return (
-    <header className="left-0 right-0 top-0 flex h-14 flex-col bg-teal-500 pl-5 pr-4 text-white">
+    <header className="h-navbar fixed left-0 right-0 top-0 z-50 flex bg-teal-500 pl-5 pr-4 text-white">
       <div className="flex flex-1">
         <div className="flex h-full flex-row items-center">
           <div className="mr-4 h-6 w-6 cursor-pointer rounded-full hover:bg-white">

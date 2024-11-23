@@ -9,6 +9,7 @@ import { TableTabsSkeleton } from "~/app/loading/tableTabsSkeleton";
 import { NavbarSkeleton } from "~/app/loading/NavbarSkeleton";
 import { DataTable } from "~/app/_components/home/DataTable";
 import { columns } from "tailwindcss/defaultTheme";
+import Toolbar from "~/app/_components/home/toolBar";
 interface PageProps {
   params: Promise<{
     tableId: string;
@@ -57,6 +58,7 @@ export default async function TablePage({ params }: PageProps) {
       <Suspense fallback={<TableTabsSkeleton />}>
         <TabsContent tableId={tableId} />
       </Suspense>
+      <Toolbar />
       <DataTable />
     </>
   );

@@ -15,6 +15,7 @@ type Row = {
   notes: string;
   assignee: string;
   status: string;
+  [key: string]: string | number; // More specific union type instead of any
 };
 
 // Sample data for the table
@@ -47,73 +48,146 @@ const data: Row[] = [
 // Initialize column helper
 const columnHelper = createColumnHelper<Row>();
 
+// Function to create column configuration
+const createColumn = (id: string, header: string, displayType: string) => {
+  return columnHelper.accessor(id, {
+    header: () => (
+      <div className="contentWrapper">
+        <div className="flex items-center gap-2">
+          <div className="relative" title={displayType}>
+            <svg
+              width="16"
+              height="16"
+              viewBox="0 0 16 16"
+              className="flex-none"
+            >
+              <use
+                fill="currentColor"
+                fillOpacity="0.75"
+                href="/icons/icon_definitions.svg#TextAlt"
+              />
+            </svg>
+          </div>
+          <span className="name">
+            <div className="flex w-full items-center justify-between">
+              <div className="truncate-pre">{header}</div>
+              <div className="flex items-center">
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="16"
+                  height="16"
+                  viewBox="0 0 16 16"
+                  className="opacity-75"
+                >
+                  <use
+                    fill="currentColor"
+                    fillOpacity="0.75"
+                    href="/icons/icon_definitions.svg#ChevronDown"
+                  />
+                </svg>
+              </div>
+            </div>
+          </span>
+        </div>
+      </div>
+    ),
+    cell: (info) => (
+      <div className="w-full p-1.5">{info.getValue() as string}</div>
+    ),
+  });
+};
+
 export function DataTable() {
   const [rowSelection, setRowSelection] = useState({});
+  const [tableData, setTableData] = useState<Row[]>(data); // Convert static data to state
 
-  // Define table columns
-  const columns = [
+  // Convert columns to state
+  const [columns, setColumns] = useState(() => [
     // Selection Column
     columnHelper.display({
       id: "select",
+      cell: ({ row }) => (
+        <span className="flex items-center">
+          <span className="ml-2 w-2 text-center text-[12px] font-light text-gray-500">
+            {row.original.id}
+          </span>
+        </span>
+      ),
       header: ({ table }) => (
         <input
           type="checkbox"
           checked={table.getIsAllRowsSelected()}
           onChange={table.getToggleAllRowsSelectedHandler()}
-          className="h-4 w-4 rounded border-gray-300"
-        />
-      ),
-      cell: ({ row }) => (
-        <input
-          type="checkbox"
-          checked={row.getIsSelected()}
-          onChange={row.getToggleSelectedHandler()}
-          className="h-4 w-4 rounded border-gray-300"
+          className="h-3 w-3 rounded border-gray-300"
         />
       ),
       size: 40,
     }),
-    // Name Column
-    columnHelper.accessor("name", {
-      header: () => (
-        <div className="flex items-center gap-2">
-          Name
-          <button className="text-gray-500">↓</button>
+    // Reusable columns
+    createColumn("name", "Name", "Single line text"),
+    createColumn("notes", "Notes", "Multi-line text"),
+    createColumn("assignee", "Assignee", "Single line text"),
+    createColumn("status", "Status", "Single line text"),
+  ]);
+
+  // Add function to handle new columns
+  const handleAddColumn = () => {
+    const newColumnId = `newColumn${columns.length + 1}`;
+    const newColumn = columnHelper.accessor(newColumnId, {
+      header: "New Column",
+      cell: (info) => (
+        <div
+          className="w-full p-1.5"
+          contentEditable
+          suppressContentEditableWarning
+          onInput={(e) => {
+            const newValue = e.currentTarget.textContent ?? "";
+            setTableData((prevData) =>
+              prevData.map((row) =>
+                row.id === info.row.original.id
+                  ? { ...row, [newColumnId]: newValue }
+                  : row,
+              ),
+            );
+          }}
+        >
+          {info.getValue() ?? ""}
         </div>
       ),
-    }),
-    // Notes Column
-    columnHelper.accessor("notes", {
-      header: () => (
-        <div className="flex items-center gap-2">
-          Notes
-          <button className="text-gray-500">↓</button>
-        </div>
-      ),
-    }),
-    // Assignee Column
-    columnHelper.accessor("assignee", {
-      header: () => (
-        <div className="flex items-center gap-2">
-          Assignee
-          <button className="text-gray-500">↓</button>
-        </div>
-      ),
-    }),
-    // Status Column
-    columnHelper.accessor("status", {
-      header: () => (
-        <div className="flex items-center gap-2">
-          Status
-          <button className="text-gray-500">↓</button>
-        </div>
-      ),
-    }),
-  ];
+    });
+
+    setColumns((prevColumns) => [...prevColumns, newColumn]);
+    setTableData((prevData) =>
+      prevData.map((row) => ({ ...row, [newColumnId]: "" })),
+    );
+  };
+
+  // Add function to handle new rows
+  const handleAddRow = () => {
+    const newRow: Row = {
+      id: tableData.length + 1,
+      name: "",
+      notes: "",
+      assignee: "",
+      status: "",
+    };
+
+    // Add empty values for any dynamic columns
+    columns.forEach((column) => {
+      if (
+        column.id &&
+        !["select", "name", "notes", "assignee", "status"].includes(column.id)
+      ) {
+        newRow[column.id] = "";
+      }
+    });
+
+    setTableData((prevData) => [...prevData, newRow]);
+  };
 
   // Initialize the table instance
   const table = useReactTable({
-    data,
+    data: tableData,
     columns,
     state: { rowSelection },
     enableRowSelection: true,
@@ -122,8 +196,8 @@ export function DataTable() {
   });
 
   return (
-    <div className="relative flex h-screen flex-row overflow-auto bg-[#f8f8f8]">
-      <table className="relative top-0 cursor-pointer border-r-0 p-0">
+    <div className="fixed bottom-0 left-0 right-0 top-[calc(theme(spacing.navbar)+2rem+theme(spacing.toolbar))] flex flex-row overflow-auto bg-[#f8f8f8]">
+      <table className="relative w-full cursor-pointer border-r-0 p-0">
         {/* Table Header */}
         <thead className="z-10 h-8">
           {table.getHeaderGroups().map((headerGroup) => (
@@ -131,16 +205,19 @@ export function DataTable() {
               {headerGroup.headers.map((header) => (
                 <th
                   key={header.id}
-                  className="border-b-at-table-bot-gray relative box-border flex h-8 min-w-16 cursor-pointer border-b bg-[#f5f5f5] p-0 leading-6 hover:bg-[#f8f8f8]"
+                  className="relative box-border flex h-8 min-w-16 cursor-pointer border-b border-r-[0.8px] border-r-gray-300 bg-[#f1f6ff] p-0 leading-6"
+                  style={{
+                    width: header.column.id === "select" ? "72px" : "174px",
+                  }}
                 >
                   {header.isPlaceholder ? null : (
-                    <div className="relative flex h-full w-[124px] flex-grow items-center">
-                      <p className="relative h-auto w-full overflow-clip text-ellipsis whitespace-nowrap pl-2 text-start text-[13px]">
+                    <div className="relative flex h-full w-full flex-grow items-center">
+                      <span className="relative h-auto w-full overflow-clip pl-2 text-start text-[13px] font-normal">
                         {flexRender(
                           header.column.columnDef.header,
                           header.getContext(),
                         )}
-                      </p>
+                      </span>
                       <span className="flex-end relative bottom-0 right-0 top-0 flex h-full items-center pl-1 pr-1.5">
                         <svg
                           xmlns="http://www.w3.org/2000/svg"
@@ -160,6 +237,19 @@ export function DataTable() {
                   )}
                 </th>
               ))}
+              {/* Add Column Button in Header */}
+              <th
+                onClick={handleAddColumn}
+                className="relative box-border flex h-8 min-w-16 cursor-pointer border-b border-r-[0.8px] border-r-gray-300 bg-[#f1f6ff] p-0 leading-6 hover:bg-[#f8f8f8]"
+                style={{ width: "40px" }} // Reduced width since it's just a button
+              >
+                <span
+                  className="m-auto text-[25px] font-thin text-gray-600 hover:text-gray-800"
+                  title="Add Column"
+                >
+                  +
+                </span>
+              </th>
             </tr>
           ))}
         </thead>
@@ -169,45 +259,36 @@ export function DataTable() {
           {table.getRowModel().rows.map((row) => (
             <tr
               key={row.id}
-              className="absolute z-0 flex h-8 bg-white hover:bg-[#f8f8f8]"
+              className="absolute z-0 flex h-8"
               style={{ top: `${row.index * 32}px`, left: 0, width: "100%" }}
             >
               {row.getVisibleCells().map((cell) => (
                 <td
                   key={cell.id}
-                  className="focus:border-at-btn-primary flex border-b-[0.8px] border-r-[0.8px] bg-white"
-                  style={{ width: "150px" }}
+                  className="flex border-b-[0.8px] border-r-[0.8px] bg-white text-[13px] font-normal hover:bg-[#f8f8f8]"
+                  style={{
+                    width: cell.column.id === "select" ? "72px" : "174px",
+                  }}
                 >
-                  <input
-                    className="focus:shadow-at-focus-cell w-full text-ellipsis p-1.5 outline-none focus:z-50 focus:rounded-sm"
-                    value={
-                      flexRender(
-                        cell.column.columnDef.cell,
-                        cell.getContext(),
-                      ) as string
-                    }
-                  />
+                  {flexRender(cell.column.columnDef.cell, cell.getContext())}
                 </td>
               ))}
+              {/* Removed the extra cell */}
             </tr>
           ))}
 
-          {/* Add New Row Button */}
-          <tr className="absolute flex h-8 w-full bg-white hover:bg-[#f8f8f8]">
-            <td className="border-at-table-bot-gray h-8 w-full border-b-[0.8px] border-r-[0.8px]">
-              <div className="absolute left-2 top-2">
-                <svg
-                  width="16"
-                  height="16"
-                  viewBox="0 0 16 16"
-                  className="icon flex-none"
-                >
-                  <use
-                    fill="currentColor"
-                    href="/icons/icon_definitions.svg#Plus"
-                  />
-                </svg>
-              </div>
+          {/* Update Add New Row Button */}
+          <tr
+            className="absolute flex h-8 border-b-[0.8px] border-r-[0.8px] bg-white hover:bg-[#f8f8f8]"
+            style={{
+              top: `${table.getRowModel().rows.length * 32}px`,
+              left: 0,
+              width: `${(columns.length - 1) * 174 + 72}px`,
+            }}
+            onClick={handleAddRow} // Added onClick to the <tr>
+          >
+            <td className="flex w-full items-center px-2">
+              <button className="text-gray-600 hover:text-gray-800">+</button>
             </td>
           </tr>
         </tbody>

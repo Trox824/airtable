@@ -92,7 +92,7 @@ export function TableTabs({
   }, [selectedTableId, baseId]);
 
   return (
-    <div className="relative h-8 bg-teal-500 text-white">
+    <div className="top-navbar fixed left-0 right-0 z-40 h-8 bg-teal-500 text-white">
       <div className="flex h-8 flex-row justify-between">
         {/* Left side content */}
         <div className="flex w-full flex-row items-center overflow-scroll rounded-tr-lg bg-white [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
@@ -111,7 +111,7 @@ export function TableTabs({
             <div
               key={table.id}
               onClick={() => setCurrentTableId(table.id)}
-              className={`h-full bg-teal-500 [background:linear-gradient(rgba(0,0,0,0.1),rgba(0,0,0,0.1)),rgb(20,184,166)] ${
+              className={`h-full cursor-pointer bg-teal-500 [background:linear-gradient(rgba(0,0,0,0.1),rgba(0,0,0,0.1)),rgb(20,184,166)] ${
                 localTables[index] &&
                 localTables[index + 1]?.id === selectedTableId
                   ? "rounded-br-sm"
@@ -122,7 +122,7 @@ export function TableTabs({
               }`}
             >
               <div
-                className={`relative flex h-full items-center pl-3 ${
+                className={`relative flex h-full items-center p-3 ${
                   selectedTableId !== table.id ? "" : "rounded-t-sm bg-white"
                 }`}
               >
@@ -156,7 +156,7 @@ export function TableTabs({
             tabIndex={0}
             role="button"
             aria-label="Search all tables"
-            className={`pointer focus-visible-opaque focus-container flex h-full flex-none items-center justify-center ${
+            className={`pointer focus-visible-opaque focus-container flex h-full flex-none cursor-pointer items-center justify-center ${
               selectedTableId === localTables[localTables.length - 1]?.id
                 ? "rounded-bl-sm"
                 : ""
@@ -197,7 +197,7 @@ export function TableTabs({
           ) : (
             <div
               onClick={handleCreateTable}
-              className="flex h-full items-center bg-teal-500 px-2 [background:linear-gradient(rgba(0,0,0,0.1),rgba(0,0,0,0.1)),rgb(20,184,166)]"
+              className="flex h-full cursor-pointer items-center bg-teal-500 px-2 [background:linear-gradient(rgba(0,0,0,0.1),rgba(0,0,0,0.1)),rgb(20,184,166)]"
             >
               <span className="flex cursor-pointer flex-row items-center">
                 <svg
@@ -211,7 +211,7 @@ export function TableTabs({
                 >
                   <path d="M8 1v14M1 8h14" />
                 </svg>
-                {tables.length === 5 && (
+                {tables.length === 1 && (
                   <p className="text-[13px] font-normal">Add or import</p>
                 )}
               </span>
