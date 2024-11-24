@@ -4,6 +4,8 @@ import { api } from "~/trpc/react";
 import { useRouter } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
 import { Base } from "@prisma/client";
+import { signOut } from "next-auth/react";
+
 const HomePage: React.FC = () => {
   const [isCreating, setIsCreating] = useState(false);
   const [newBaseName, setNewBaseName] = useState("");
@@ -79,6 +81,10 @@ const HomePage: React.FC = () => {
       createBase.mutate({ name: newBaseName });
       router.push("/loading");
     }
+  };
+
+  const handleLogout = async () => {
+    await signOut({ callbackUrl: "/login" });
   };
 
   return (
@@ -171,6 +177,12 @@ const HomePage: React.FC = () => {
           <div className="ml-2 flex h-8 w-8 items-center justify-center rounded-full bg-[#172B4D] text-white">
             <span className="text-sm">N</span>
           </div>
+          <button
+            onClick={handleLogout}
+            className="p-2 text-red-600 hover:text-red-800"
+          >
+            Logout
+          </button>
         </div>
       </div>
 

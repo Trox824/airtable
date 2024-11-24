@@ -29,13 +29,13 @@ export default function LoginPage() {
     if (result?.error) {
       setErrorMessage("Invalid email or password");
     } else {
-      router.push("/table");
+      router.push("/");
     }
   };
   const handleGoogleSignIn = async () => {
     try {
       await signIn("google");
-      router.push("/table");
+      router.push("/");
     } catch (error) {
       console.error("Google sign-in error:", error);
     }
