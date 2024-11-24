@@ -21,8 +21,11 @@ export const baseRouter = createTRPCRouter({
         });
       }
 
-      // Create base and initial table in a transaction
+      // Create base, table, columns, and rows in a transaction
       return ctx.db.$transaction(async (tx) => {
+        // Increase the timeout for the transaction
+        await tx.$executeRaw`SET LOCAL statement_timeout = '10000';`; // Set to 10 seconds
+
         const base = await tx.base.create({
           data: {
             name: input.name,
@@ -31,12 +34,50 @@ export const baseRouter = createTRPCRouter({
         });
 
         // Create initial table
-        await tx.table.create({
+        const table = await tx.table.create({
           data: {
             name: "Table 1",
             baseId: base.id,
           },
         });
+
+        // Create two initial columns
+        const columns = await Promise.all([
+          tx.column.create({
+            data: {
+              name: "Untitled Column",
+              tableId: table.id,
+              type: "Text",
+            },
+          }),
+          tx.column.create({
+            data: {
+              name: "Untitled Column",
+              tableId: table.id,
+              type: "Text",
+            },
+          }),
+        ]);
+
+        // Create four initial rows with empty cells
+        await Promise.all(
+          Array.from({ length: 4 }).map(async () => {
+            const row = await tx.row.create({
+              data: {
+                tableId: table.id,
+              },
+            });
+
+            // Create empty cells for each column
+            await tx.cell.createMany({
+              data: columns.map((column) => ({
+                rowId: row.id,
+                columnId: column.id,
+                valueText: "",
+              })),
+            });
+          }),
+        );
 
         return base;
       });
@@ -67,7 +108,6 @@ export const baseRouter = createTRPCRouter({
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      // Ensure user is authenticated
       const session = await getServerSession(authOptions);
       if (!session) {
         throw new TRPCError({
@@ -75,8 +115,6 @@ export const baseRouter = createTRPCRouter({
           message: "You must be logged in to delete a base",
         });
       }
-
-      // Check if the base belongs to the user
       const base = await ctx.db.base.findUnique({
         where: { id: input.id },
       });
@@ -91,5 +129,30 @@ export const baseRouter = createTRPCRouter({
       return ctx.db.base.delete({
         where: { id: input.id },
       });
+    }),
+  fetchById: publicProcedure
+    .input(z.object({ id: z.string() }))
+    .query(async ({ ctx, input }) => {
+      const session = await getServerSession(authOptions);
+      if (!session) {
+        throw new TRPCError({
+          code: "UNAUTHORIZED",
+          message: "You must be logged in to fetch this base",
+        });
+      }
+
+      const base = await ctx.db.base.findUnique({
+        where: { id: input.id },
+      });
+
+      // Check if base exists and belongs to the user
+      if (!base || base.userId !== session.user.id) {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "You do not have permission to access this base",
+        });
+      }
+
+      return base;
     }),
 });

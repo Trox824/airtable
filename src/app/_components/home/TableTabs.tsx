@@ -5,22 +5,18 @@ import Link from "next/link";
 import { useState, useEffect } from "react";
 import { api } from "~/trpc/react";
 import React from "react";
+import { useRouter } from "next/navigation";
 
 interface TableTabsProps {
-  tables: Table[];
   currentTableId: string;
   baseId: string;
 }
-export function TableTabs({
-  tables = [],
-  currentTableId,
-  baseId,
-}: TableTabsProps) {
+export function TableTabs({ currentTableId, baseId }: TableTabsProps) {
+  const { data: tables } = api.tables.getByBaseId.useQuery({ baseId });
   const [isCreating, setIsCreating] = useState(false);
   const [newTableName, setNewTableName] = useState("");
-  const [localTables, setLocalTables] = useState<Table[]>(tables);
+  const [localTables, setLocalTables] = useState<Table[]>(tables ?? []);
   const [selectedTableId, setCurrentTableId] = useState<string>(currentTableId);
-
   const utils = api.useUtils();
   const createTable = api.tables.create.useMutation({
     onMutate: async (newTable) => {
@@ -62,6 +58,8 @@ export function TableTabs({
     },
   });
 
+  const router = useRouter();
+
   const handleCreateTable = () => {
     setIsCreating(true);
   };
@@ -73,6 +71,11 @@ export function TableTabs({
       setNewTableName("");
       setIsCreating(false);
     }
+  };
+
+  const handleTableClick = (tableId: string) => {
+    setCurrentTableId(tableId);
+    router.push(`/${baseId}/${tableId}`);
   };
 
   // Load the cached table ID on component mount
@@ -91,8 +94,13 @@ export function TableTabs({
     localStorage.setItem(`selectedTable-${baseId}`, selectedTableId);
   }, [selectedTableId, baseId]);
 
+  // Update localTables when tables prop changes
+  useEffect(() => {
+    setLocalTables(tables ?? []);
+  }, [tables]);
+
   return (
-    <div className="top-navbar fixed left-0 right-0 z-40 h-8 bg-teal-500 text-white">
+    <div className="fixed left-0 right-0 top-navbar z-40 h-8 bg-teal-500 text-white">
       <div className="flex h-8 flex-row justify-between">
         {/* Left side content */}
         <div className="flex w-full flex-row items-center overflow-scroll rounded-tr-lg bg-white [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
@@ -110,7 +118,7 @@ export function TableTabs({
           {localTables.map((table, index) => (
             <div
               key={table.id}
-              onClick={() => setCurrentTableId(table.id)}
+              onClick={() => handleTableClick(table.id)}
               className={`h-full cursor-pointer bg-teal-500 [background:linear-gradient(rgba(0,0,0,0.1),rgba(0,0,0,0.1)),rgb(20,184,166)] ${
                 localTables[index] &&
                 localTables[index + 1]?.id === selectedTableId
@@ -146,7 +154,6 @@ export function TableTabs({
                     <path d="M4 6l4 4 4-4H4z" />
                   </svg>
                 )}
-                <div className="ml-2 h-[13px] border-r-[1px] border-white/10"></div>
               </div>
             </div>
           ))}
@@ -211,7 +218,7 @@ export function TableTabs({
                 >
                   <path d="M8 1v14M1 8h14" />
                 </svg>
-                {tables.length === 1 && (
+                {localTables.length === 1 && (
                   <p className="text-[13px] font-normal">Add or import</p>
                 )}
               </span>

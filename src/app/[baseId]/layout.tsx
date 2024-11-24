@@ -1,0 +1,23 @@
+import React, { Suspense } from "react";
+import { Navbar } from "~/app/_components/home/navbar";
+import { NavbarSkeleton } from "~/app/loading/NavbarSkeleton";
+
+interface LayoutProps {
+  children: React.ReactNode;
+  params: Promise<{
+    baseId: string;
+  }>;
+}
+
+export default async function Layout({ children, params }: LayoutProps) {
+  const { baseId } = await params;
+
+  return (
+    <>
+      <Suspense fallback={<NavbarSkeleton />}>
+        <Navbar BaseId={baseId} />
+      </Suspense>
+      {children}
+    </>
+  );
+}

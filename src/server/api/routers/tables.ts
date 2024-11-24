@@ -13,14 +13,6 @@ export const tablesRouter = createTRPCRouter({
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      // Verify user owns the base
-      const session = await getServerSession(authOptions);
-      if (!session) {
-        throw new TRPCError({
-          code: "UNAUTHORIZED",
-          message: "You must be logged in to create a base",
-        });
-      }
       return ctx.db.table.create({
         data: {
           baseId: input.baseId,
@@ -36,27 +28,14 @@ export const tablesRouter = createTRPCRouter({
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      // Verify user owns the table through base
-      const session = await getServerSession(authOptions);
-      if (!session) {
-        throw new TRPCError({
-          code: "UNAUTHORIZED",
-          message: "You must be logged in to delete a table",
-        });
-      }
       const table = await ctx.db.table.findFirst({
         where: {
           id: input.id,
-          base: {
-            userId: session.user.id,
-          },
         },
       });
-
       if (!table) {
-        throw new Error("Table not found or unauthorized");
+        throw new Error("Table not found");
       }
-
       return ctx.db.table.delete({
         where: {
           id: input.id,
@@ -71,25 +50,6 @@ export const tablesRouter = createTRPCRouter({
       }),
     )
     .query(async ({ ctx, input }) => {
-      // Verify user owns the base
-      const session = await getServerSession(authOptions);
-      if (!session) {
-        throw new TRPCError({
-          code: "UNAUTHORIZED",
-          message: "You must be logged in to get tables",
-        });
-      }
-      const base = await ctx.db.base.findFirst({
-        where: {
-          id: input.baseId,
-          userId: session.user.id,
-        },
-      });
-
-      if (!base) {
-        throw new Error("Base not found or unauthorized");
-      }
-
       return ctx.db.table.findMany({
         where: {
           baseId: input.baseId,
@@ -107,31 +67,17 @@ export const tablesRouter = createTRPCRouter({
       }),
     )
     .query(async ({ ctx, input }) => {
-      // Verify user owns the table through base
-      const session = await getServerSession(authOptions);
-      if (!session) {
-        throw new TRPCError({
-          code: "UNAUTHORIZED",
-          message: "You must be logged in to access this table",
-        });
-      }
-
       const table = await ctx.db.table.findFirst({
         where: {
           id: input.id,
-          base: {
-            userId: session.user.id,
-          },
         },
       });
-
       if (!table) {
         throw new TRPCError({
           code: "NOT_FOUND",
           message: "Table not found or unauthorized",
         });
       }
-
       return table;
     }),
 });

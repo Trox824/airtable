@@ -1,16 +1,32 @@
+"use client";
 import Link from "next/link";
-import { type Base } from "@prisma/client";
+import { api } from "~/trpc/react";
 
 interface NavbarProps {
-  currentBase: Base;
-  allBases: Base[];
+  BaseId: string;
 }
 
-export function Navbar({ currentBase, allBases }: NavbarProps) {
-  const baseName = currentBase?.name ?? "Loading...";
+export function Navbar({ BaseId }: NavbarProps) {
+  const {
+    data: base,
+    isLoading,
+    error,
+  } = api.base.fetchById.useQuery(
+    { id: BaseId },
+    {
+      retry: false,
+      enabled: !!BaseId,
+    },
+  );
+
+  const baseName = isLoading
+    ? "Loading..."
+    : error
+      ? "Error fetching base"
+      : (base?.name ?? "Not Found");
 
   return (
-    <header className="h-navbar fixed left-0 right-0 top-0 z-50 flex bg-teal-500 pl-5 pr-4 text-white">
+    <header className="fixed left-0 right-0 top-0 z-50 flex h-navbar bg-teal-500 pl-5 pr-4 text-white">
       <div className="flex flex-1">
         <div className="flex h-full flex-row items-center">
           <div className="mr-4 h-6 w-6 cursor-pointer rounded-full hover:bg-white">
@@ -63,7 +79,7 @@ export function Navbar({ currentBase, allBases }: NavbarProps) {
             {["Data", "Automations", "Interfaces"].map((item) => (
               <div
                 key={item}
-                className="mr-[8px] flex h-7 cursor-pointer flex-row items-center rounded-full px-3 text-black/65 hover:bg-black/10"
+                className={`mr-[8px] flex h-7 cursor-pointer flex-row items-center rounded-full px-3 text-black/65 ${item === "Data" ? "bg-black/10" : ""}`}
               >
                 <Link className="flex items-center" href="/">
                   <p className="text-[13px] text-white">{item}</p>
@@ -83,33 +99,6 @@ export function Navbar({ currentBase, allBases }: NavbarProps) {
 
         {/* Right section with icons and profile */}
         <div className="flex flex-1 items-center justify-end">
-          <div></div>
-          <div className="flex h-7 cursor-pointer flex-row items-center rounded-full px-3 text-black/65 hover:bg-black/10">
-            <svg
-              width="16"
-              height="16"
-              viewBox="0 0 16 16"
-              className="icon flex-none"
-            >
-              <path
-                fill="#FFFFFF"
-                d="M8 0C3.6 0 0 3.6 0 8s3.6 8 8 8 8-3.6 8-8-3.6-8-8-8zm0 14c-3.3 0-6-2.7-6-6s2.7-6 6-6 6 2.7 6 6-2.7 6-6 6zm0-10c-1.4 0-2.5 1.1-2.5 2.5h1.5c0-.6.4-1 1-1s1 .4 1 1c0 1-1.5 1.5-1.5 2.5v.5h1.5v-.5c0-.5 1.5-1 1.5-2.5 0-1.4-1.1-2.5-2.5-2.5zM7.3 11h1.5v-1.5H7.3z"
-              />
-            </svg>
-          </div>
-          <div className="flex h-7 cursor-pointer flex-row items-center rounded-full px-3 text-black/65 hover:bg-black/10">
-            <svg
-              width="16"
-              height="16"
-              viewBox="0 0 16 16"
-              className="icon flex-none"
-            >
-              <path
-                fill="#FFFFFF"
-                d="M8 0L2.5 9h11L8 0zm0 3.98L10.76 8H5.24L8 3.98zM2.5 11v2h11v-2h-11z"
-              />
-            </svg>
-          </div>
           <div className="flex h-7 cursor-pointer flex-row items-center rounded-full px-3 text-black/65 hover:bg-black/10">
             <svg
               width="16"
@@ -123,6 +112,23 @@ export function Navbar({ currentBase, allBases }: NavbarProps) {
               />
             </svg>
           </div>
+          <div className="flex h-7 cursor-pointer flex-row items-center rounded-full px-3 text-[13px] font-normal text-white hover:bg-black/10">
+            <svg
+              width="16"
+              height="16"
+              viewBox="0 0 16 16"
+              className="icon mr-1 flex-none"
+            >
+              <path
+                fill="#FFFFFF"
+                d="M8 0C3.6 0 0 3.6 0 8s3.6 8 8 8 8-3.6 8-8-3.6-8-8-8zm0 14c-3.3 0-6-2.7-6-6s2.7-6 6-6 6 2.7 6 6-2.7 6-6 6zm0-10c-1.4 0-2.5 1.1-2.5 2.5h1.5c0-.6.4-1 1-1s1 .4 1 1c0 1-1.5 1.5-1.5 2.5v.5h1.5v-.5c0-.5 1.5-1 1.5-2.5 0-1.4-1.1-2.5-2.5-2.5zM7.3 11h1.5v-1.5H7.3z"
+              />
+            </svg>
+            <span className="hover:text-white/100">Help</span>
+          </div>
+          <div className="bg:black/10 mx-4 rounded-2xl bg-black/10 px-3 py-[6px] text-[13px] font-normal shadow">
+            Trial: 12 days left
+          </div>
           <div className="flex h-7 cursor-pointer flex-row items-center text-black/65">
             <span className="mr-2 flex items-center rounded-2xl bg-white px-3 py-1 text-[13px] text-teal-500 shadow">
               <svg
@@ -135,7 +141,7 @@ export function Navbar({ currentBase, allBases }: NavbarProps) {
                 strokeWidth="1.5"
                 strokeLinecap="round"
                 strokeLinejoin="round"
-                className="flex-none"
+                className="mr-1 flex-none"
               >
                 <path d="M18 20c0-3.37-2-6.5-4-8a5 5 0 0 0-.45-8.3"></path>
                 <circle cx="10" cy="8" r="5"></circle>
