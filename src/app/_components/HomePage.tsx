@@ -6,18 +6,42 @@ import { useQueryClient } from "@tanstack/react-query";
 import { Base } from "@prisma/client";
 import { signOut } from "next-auth/react";
 
+interface TableType {
+  id: string;
+  name: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+interface BaseType {
+  id: string;
+  userId: string;
+  name: string;
+  createdAt: Date;
+  updatedAt: Date;
+  tables?: { id: string }[];
+}
+
 const HomePage: React.FC = () => {
   const [isCreating, setIsCreating] = useState(false);
   const [newBaseName, setNewBaseName] = useState("");
-  const [localBases, setLocalBases] = useState<Base[]>([]);
+  const [localBases, setLocalBases] = useState<BaseType[]>([]);
   const router = useRouter();
   const queryClient = useQueryClient();
 
   const { isLoading, error, data } = api.base.getAll.useQuery();
-
+  console.log(data);
   useEffect(() => {
     if (data) {
-      setLocalBases(data);
+      const mappedData: BaseType[] = data.map((item: BaseType) => ({
+        name: item.name,
+        id: item.id,
+        userId: item.userId,
+        createdAt: item.createdAt,
+        updatedAt: item.updatedAt,
+        tables: item.tables,
+      }));
+      setLocalBases(mappedData);
     }
   }, [data]);
 
@@ -443,7 +467,7 @@ const HomePage: React.FC = () => {
               // Actual base items
               localBases?.map((base) => (
                 <div key={base.id} className="group relative">
-                  <Link href={`/${base.id}`}>
+                  <Link href={`/${base.id}/${base.tables?.[0]?.id}`}>
                     <div className="shadow-at-main-nav hover:shadow-at-main-nav-hover mt-1 h-24 rounded-md border bg-white p-4">
                       <div className="flex h-full w-full items-center">
                         <div className="mr-4 flex h-14 w-14 items-center justify-center rounded-lg bg-teal-500">

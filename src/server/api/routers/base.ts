@@ -94,9 +94,17 @@ export const baseRouter = createTRPCRouter({
       });
     }
 
+    // Fetch bases along with their associated table IDs
     return ctx.db.base.findMany({
       where: {
         userId: session.user.id,
+      },
+      include: {
+        tables: {
+          select: {
+            id: true,
+          },
+        },
       },
     });
   }),

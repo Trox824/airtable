@@ -23,23 +23,23 @@ export function DataTable({ tableId }: { tableId: string }) {
   const { data: rows, isLoading: loadingRows } = api.rows.getByTableId.useQuery(
     { tableId },
   );
-
   // State to manage dropdown visibility
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   // Refs for handling outside clicks
   const dropdownRef = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
-
   // Check if either columns or rows are loading
   const isLoading = loadingColumns || loadingRows;
-
   // Skeleton loading UI
   const renderSkeleton = () => (
     <div className="skeleton-loader">
-      {/* Add your skeleton loading styles here */}
-      <div className="skeleton-header">Loading...</div>
-      <div className="skeleton-row">Loading...</div>
-      <div className="skeleton-row">Loading...</div>
+      {/* Center the skeleton loader */}
+      <div className="flex h-screen w-full items-center justify-center">
+        <div className="flex flex-col items-center gap-4">
+          <div className="h-8 w-8 animate-spin rounded-full border-4 border-gray-300 border-t-blue-500"></div>
+          <div className="text-lg font-medium text-gray-600">Loading...</div>
+        </div>
+      </div>
     </div>
   );
 
@@ -374,7 +374,9 @@ export function DataTable({ tableId }: { tableId: string }) {
     <>
       <div className="fixed bottom-0 left-0 right-0 top-[calc(theme(spacing.navbar)+2rem+theme(spacing.toolbar))] flex flex-row overflow-auto bg-[#f8f8f8]">
         {isLoading ? (
-          renderSkeleton()
+          <div className="flex h-full w-full items-center justify-center">
+            {renderSkeleton()}
+          </div>
         ) : (
           <table className="relative w-full cursor-pointer border-r-0 p-0">
             <TableHeader
