@@ -28,8 +28,11 @@ const HomePage: React.FC = () => {
   const [localBases, setLocalBases] = useState<BaseType[]>([]);
   const router = useRouter();
   const queryClient = useQueryClient();
+  const [isLoadingBase, setIsLoadingBase] = useState(false);
+  const [isOptimisticBase, setIsOptimisticBase] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
 
-  const { isLoading, error, data } = api.base.getAll.useQuery();
+  const { isLoading: apiLoading, error, data } = api.base.getAll.useQuery();
   console.log(data);
   useEffect(() => {
     if (data) {
@@ -42,40 +45,60 @@ const HomePage: React.FC = () => {
         tables: item.tables,
       }));
       setLocalBases(mappedData);
+      setIsLoading(false);
     }
   }, [data]);
 
   const createBase = api.base.create.useMutation({
     onMutate: async (newBase) => {
-      const tempBase: Base = {
-        id: `temp-${Date.now()}`,
+      // Cancel outgoing refetches
+      await queryClient.cancelQueries({ queryKey: ["base.getAll"] });
+
+      // Keep track of optimistic base ID
+      const optimisticId = `temp-${Date.now()}`;
+      setIsOptimisticBase(optimisticId);
+
+      // Create optimistic base
+      const optimisticBase: BaseType = {
+        id: optimisticId,
         name: newBase.name,
+        userId: "temp",
         createdAt: new Date(),
         updatedAt: new Date(),
-        userId: "temp",
+        tables: [],
       };
-      setLocalBases((prev) => [...prev, tempBase]);
+
+      // Add optimistic base to local state
+      setLocalBases((prev) => [...prev, optimisticBase]);
       setIsCreating(false);
       setNewBaseName("");
-      return { tempBase };
+
+      // Navigate to the new base page immediately
+      router.push(`/${optimisticId}`);
+      
+      return { optimisticBase };
     },
     onSuccess: (created, _, context) => {
-      if (context?.tempBase) {
+      if (context?.optimisticBase) {
         setLocalBases((prev) =>
           prev.map((base) =>
-            base.id === context.tempBase.id ? created : base,
+            base.id === context.optimisticBase.id ? created : base,
           ),
         );
       }
+      setIsOptimisticBase(null);
       void queryClient.invalidateQueries({ queryKey: ["base.getAll"] });
       router.push(`/${created.id}`);
+      setIsLoadingBase(false);
     },
     onError: (_, __, context) => {
-      if (context?.tempBase) {
+      if (context?.optimisticBase) {
         setLocalBases((prev) =>
-          prev.filter((base) => base.id !== context.tempBase.id),
+          prev.filter((base) => base.id !== context.optimisticBase.id),
         );
       }
+      setIsOptimisticBase(null);
+      setIsLoadingBase(false);
     },
   });
 
@@ -103,13 +126,31 @@ const HomePage: React.FC = () => {
     e.preventDefault();
     if (newBaseName.trim()) {
       createBase.mutate({ name: newBaseName });
-      router.push("/loading");
     }
   };
 
   const handleLogout = async () => {
     await signOut({ callbackUrl: "/login" });
   };
+
+  const LoadingSkeletons = () => (
+    <>
+      {[1, 2, 3].map((i) => (
+        <div
+          key={i}
+          className="shadow-at-main-nav h-24 rounded-md border bg-white p-4"
+        >
+          <div className="flex h-full w-full animate-pulse items-center">
+            <div className="mr-4 flex h-14 w-14 items-center justify-center rounded-lg bg-gray-200"></div>
+            <div className="flex flex-col space-y-2">
+              <div className="h-3.5 w-32 rounded bg-gray-200"></div>
+              <div className="h-3 w-16 rounded bg-gray-200"></div>
+            </div>
+          </div>
+        </div>
+      ))}
+    </>
+  );
 
   return (
     <div className="absolute h-full w-full overflow-hidden bg-[#F9FAFB]">
@@ -443,138 +484,130 @@ const HomePage: React.FC = () => {
           {/* Base Grid */}
           <div className="grid w-full grid-cols-4 gap-4">
             {isLoading ? (
-              // Loading skeletons
+              <LoadingSkeletons />
+            ) : (
               <>
-                {[1, 2, 3].map((i) => (
-                  <div
-                    key={i}
-                    className="shadow-at-main-nav h-24 rounded-md border bg-white p-4"
-                  >
-                    <div className="flex h-full w-full animate-pulse items-center">
-                      {/* Skeleton Icon */}
-                      <div className="mr-4 flex h-14 w-14 items-center justify-center rounded-lg bg-gray-200"></div>
-
-                      {/* Skeleton Text */}
-                      <div className="flex flex-col space-y-2">
-                        <div className="h-3.5 w-32 rounded bg-gray-200"></div>
-                        <div className="h-3 w-16 rounded bg-gray-200"></div>
+                {localBases?.map((base) => (
+                  <div key={base.id} className="group relative">
+                    <Link href={`/${base.id}/${base.tables?.[0]?.id}`}>
+                      <div
+                        className={`shadow-at-main-nav hover:shadow-at-main-nav-hover mt-1 h-24 rounded-md border bg-white p-4 ${isOptimisticBase === base.id ? "opacity-70" : ""}`}
+                      >
+                        <div className="flex h-full w-full items-center">
+                          <div className="mr-4 flex h-14 w-14 items-center justify-center rounded-lg bg-teal-500">
+                            {isOptimisticBase === base.id ? (
+                              <div className="h-6 w-6 animate-spin rounded-full border-b-2 border-white" />
+                            ) : (
+                              <svg width="24" height="24" viewBox="0 0 16 16">
+                                <use
+                                  fill="currentColor"
+                                  href="/icons/icon_definitions.svg?v=4ff0794f56fc1e06fa1e614b25254a46#RocketLaunch"
+                                />
+                              </svg>
+                            )}
+                          </div>
+                          <div className="">
+                            <p className="text-[13px] font-medium">
+                              {base.name}
+                            </p>
+                            <p className="mt-2 text-[11px] text-[#666]">
+                              {isOptimisticBase === base.id
+                                ? "Creating..."
+                                : "Base"}
+                            </p>
+                          </div>
+                        </div>
                       </div>
-                    </div>
+                    </Link>
+                    {/* Only show delete button for non-optimistic bases */}
+                    {isOptimisticBase !== base.id && (
+                      <button
+                        className="absolute right-0 top-1/2 mr-2 flex h-8 w-10 w-6 -translate-y-1/2 items-center justify-center rounded-md bg-black/5 opacity-0 transition-all duration-200 hover:bg-red-500 group-hover:opacity-100"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          deleteBase.mutate({ id: base.id });
+                        }}
+                      >
+                        <svg
+                          width="12"
+                          height="12"
+                          viewBox="0 0 16 16"
+                          className="text-black/40 transition-colors duration-200 hover:text-white"
+                        >
+                          <path
+                            d="M4 4L12 12M12 4L4 12"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                            strokeLinecap="round"
+                          />
+                        </svg>
+                      </button>
+                    )}
                   </div>
                 ))}
-              </>
-            ) : (
-              // Actual base items
-              localBases?.map((base) => (
-                <div key={base.id} className="group relative">
-                  <Link href={`/${base.id}/${base.tables?.[0]?.id}`}>
-                    <div className="shadow-at-main-nav hover:shadow-at-main-nav-hover mt-1 h-24 rounded-md border bg-white p-4">
-                      <div className="flex h-full w-full items-center">
-                        <div className="mr-4 flex h-14 w-14 items-center justify-center rounded-lg bg-teal-500">
-                          <svg
-                            width="24"
-                            height="24"
-                            viewBox="0 0 16 16"
-                            className="undefined"
-                          >
-                            <use
-                              fill="currentColor"
-                              href="/icons/icon_definitions.svg?v=4ff0794f56fc1e06fa1e614b25254a46#RocketLaunch"
-                            ></use>
-                          </svg>
-                        </div>
-                        <div className="">
-                          <p className="text-[13px] font-medium">{base.name}</p>
-                          <p className="mt-2 text-[11px] text-[#666]">Base</p>
-                        </div>
-                      </div>
-                    </div>
-                  </Link>
-                  {/* Delete Button */}
-                  <button
-                    className="absolute right-0 top-1/2 mr-2 flex h-8 w-10 w-6 -translate-y-1/2 items-center justify-center rounded-md bg-black/5 opacity-0 transition-all duration-200 hover:bg-red-500 group-hover:opacity-100"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      deleteBase.mutate({ id: base.id });
-                    }}
-                  >
-                    <svg
-                      width="12"
-                      height="12"
-                      viewBox="0 0 16 16"
-                      className="text-black/40 transition-colors duration-200 hover:text-white"
-                    >
-                      <path
-                        d="M4 4L12 12M12 4L4 12"
-                        stroke="currentColor"
-                        strokeWidth="2"
-                        strokeLinecap="round"
-                      />
-                    </svg>
-                  </button>
-                </div>
-              ))
-            )}
-
-            {/* Create New Base Button/Form */}
-            <div className="mt-1 h-24">
-              {isCreating ? (
-                <form
-                  onSubmit={handleCreateBase}
-                  className="shadow-at-main-nav h-full rounded-md border bg-white p-4"
-                >
-                  <div className="flex h-full flex-col justify-between">
-                    <input
-                      autoFocus
-                      type="text"
-                      value={newBaseName}
-                      onChange={(e) => setNewBaseName(e.target.value)}
-                      placeholder="Enter base name..."
-                      className="w-full border-b border-gray-200 p-2 text-sm outline-none"
-                    />
-                    <div className="flex justify-end space-x-2">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setIsCreating(false);
-                          setNewBaseName("");
-                        }}
-                        className="text-sm text-gray-500 hover:text-gray-700"
+                {/* Create New Base Button/Form */}
+                {!isLoading && (
+                  <div className="mt-1 h-24">
+                    {isCreating ? (
+                      <form
+                        onSubmit={handleCreateBase}
+                        className="shadow-at-main-nav h-full rounded-md border bg-white p-4"
                       >
-                        Cancel
-                      </button>
+                        <div className="flex h-full flex-col justify-between">
+                          <input
+                            autoFocus
+                            type="text"
+                            value={newBaseName}
+                            onChange={(e) => setNewBaseName(e.target.value)}
+                            placeholder="Enter base name..."
+                            className="w-full border-b border-gray-200 p-2 text-sm outline-none"
+                          />
+                          <div className="flex justify-end space-x-2">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setIsCreating(false);
+                                setNewBaseName("");
+                              }}
+                              className="text-sm text-gray-500 hover:text-gray-700"
+                            >
+                              Cancel
+                            </button>
+                            <button
+                              type="submit"
+                              disabled={createBase.isPending}
+                              className="rounded bg-blue-500 px-3 py-1 text-sm text-white hover:bg-blue-600 disabled:opacity-50"
+                            >
+                              Create
+                            </button>
+                          </div>
+                        </div>
+                      </form>
+                    ) : (
                       <button
-                        type="submit"
-                        disabled={createBase.isPending}
-                        className="rounded bg-blue-500 px-3 py-1 text-sm text-white hover:bg-blue-600 disabled:opacity-50"
+                        onClick={() => setIsCreating(true)}
+                        className="shadow-at-main-nav hover:shadow-at-main-nav-hover flex h-full w-full items-center justify-center rounded-md border bg-white"
                       >
-                        Create
+                        <svg
+                          width="24"
+                          height="24"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          className="text-gray-400"
+                        >
+                          <path
+                            d="M12 4v16m8-8H4"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                            strokeLinecap="round"
+                          />
+                        </svg>
                       </button>
-                    </div>
+                    )}
                   </div>
-                </form>
-              ) : (
-                <button
-                  onClick={() => setIsCreating(true)}
-                  className="shadow-at-main-nav hover:shadow-at-main-nav-hover flex h-full w-full items-center justify-center rounded-md border bg-white"
-                >
-                  <svg
-                    width="24"
-                    height="24"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    className="text-gray-400"
-                  >
-                    <path
-                      d="M12 4v16m8-8H4"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                    />
-                  </svg>
-                </button>
-              )}
-            </div>
+                )}
+              </>
+            )}
           </div>
         </div>
       </div>

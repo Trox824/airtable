@@ -1,8 +1,8 @@
-import { type Table, flexRender } from "@tanstack/react-table";
+import { type Table, flexRender, type ColumnDef } from "@tanstack/react-table";
 import { type Row } from "./types";
 import { AddColumnDropdown } from "./Dropdown";
 import { type ColumnType } from "@prisma/client";
-import { RefObject, Dispatch, SetStateAction } from "react";
+import { RefObject, Dispatch, SetStateAction, useMemo } from "react";
 
 interface TableHeaderProps {
   table: Table<Row>;
@@ -28,14 +28,27 @@ export function TableHeader({
           {headerGroup.headers.map((header) => (
             <th
               key={header.id}
-              className="relative box-border flex h-8 min-w-16 cursor-pointer border-b border-r-[0.8px] border-r-gray-300 bg-[#f1f6ff] p-0 leading-6"
+              className={`relative box-border flex h-8 cursor-pointer border-b border-r-[0.8px] border-r-gray-300 bg-[#f1f6ff] p-0 leading-6 ${
+                header.column.getIsResizing() ? "select-none" : ""
+              }`}
               style={{
-                width: header.column.id === "select" ? "72px" : "174px",
+                width: header.getSize(),
+                position: "relative",
+                userSelect: "none",
               }}
             >
               {header.isPlaceholder ? null : (
                 <div className="relative flex h-full w-full flex-grow items-center">
-                  <span className="relative h-auto w-full overflow-clip pl-2 text-start text-[13px] font-normal">
+                  <span
+                    className={`relative h-auto w-full overflow-hidden pl-2 text-start text-[13px] font-normal ${
+                      header.getSize() < 70 ? "truncate" : ""
+                    }`}
+                    style={{
+                      whiteSpace: "nowrap",
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                    }}
+                  >
                     {flexRender(
                       header.column.columnDef.header,
                       header.getContext(),
@@ -58,9 +71,22 @@ export function TableHeader({
                   </span>
                 </div>
               )}
+              {header.column.getCanResize() && (
+                <div
+                  onMouseDown={header.getResizeHandler()}
+                  onTouchStart={header.getResizeHandler()}
+                  className={`absolute right-0 top-0 h-full w-2 cursor-col-resize touch-none select-none bg-transparent hover:bg-gray-300 ${
+                    header.column.getIsResizing()
+                      ? "bg-blue-500 opacity-100"
+                      : "opacity-0 hover:opacity-100"
+                  }`}
+                  style={{
+                    transform: "translateX(50%)",
+                  }}
+                />
+              )}
             </th>
           ))}
-          {/* Add Column Button in Header */}
           <th
             className="relative box-border flex h-8 min-w-16 cursor-pointer border-b border-r-[0.8px] border-r-gray-300 bg-[#f1f6ff] p-0 leading-6 hover:bg-[#f8f8f8]"
             style={{ width: "40px" }}

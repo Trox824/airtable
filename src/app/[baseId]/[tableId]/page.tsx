@@ -17,10 +17,8 @@ interface PageProps {
     tableId: string;
   }>;
 }
-
 export default function TablePage({ params }: PageProps) {
   const { baseId, tableId } = useParams();
-
   if (!baseId || !tableId) {
     notFound();
   }

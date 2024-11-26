@@ -3,6 +3,7 @@ import { Providers } from "./providers";
 import { GeistSans } from "geist/font/sans";
 import { type Metadata } from "next";
 import { SessionProvider } from "next-auth/react";
+import { Toaster } from "sonner";
 
 import { TRPCReactProvider } from "~/trpc/react";
 
@@ -22,6 +23,7 @@ export default function RootLayout({
           <Providers>
             <TRPCReactProvider>{children}</TRPCReactProvider>
           </Providers>
+          <Toaster position="top-right" />
         </body>
       </html>
     </Providers>

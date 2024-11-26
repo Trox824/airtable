@@ -12,3 +12,23 @@
   -ms-overflow-style: none; /* IE and Edge */
   scrollbar-width: none; /* Firefox */
 }
+
+.resizer {
+  position: absolute;
+  right: 0;
+  top: 0;
+  height: 100%;
+  width: 5px;
+  cursor: col-resize;
+  user-select: none;
+  touch-action: none;
+}
+
+.resizer:hover,
+.resizer.isResizing {
+  background-color: #ddd; /* Light gray */
+}
+
+.isResizing {
+  background-color: #007bff; /* Blue when resizing */
+}

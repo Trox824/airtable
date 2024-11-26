@@ -3,164 +3,122 @@ import { createTRPCRouter, publicProcedure } from "../trpc";
 import { TRPCError } from "@trpc/server";
 import { authOptions } from "~/server/auth";
 import { getServerSession } from "next-auth";
+import { PrismaClient } from "@prisma/client";
+
+const validateSession = async () => {
+  const session = await getServerSession(authOptions);
+  if (!session) {
+    throw new TRPCError({
+      code: "UNAUTHORIZED",
+      message: "You must be logged in to access this resource",
+    });
+  }
+  return session;
+};
+
+const validateBaseOwnership = async (
+  db: PrismaClient,
+  baseId: string,
+  userId: string,
+) => {
+  const base = await db.base.findUnique({
+    where: { id: baseId },
+    select: {
+      id: true,
+      name: true,
+      userId: true,
+    },
+  });
+
+  if (!base || base.userId !== userId) {
+    throw new TRPCError({
+      code: "FORBIDDEN",
+      message: "You do not have permission to access this base",
+    });
+  }
+  return base;
+};
 
 export const baseRouter = createTRPCRouter({
   create: publicProcedure
-    .input(
-      z.object({
-        name: z.string().min(1).max(50),
-      }),
-    )
+    .input(z.object({ name: z.string().min(1).max(50) }))
     .mutation(async ({ ctx, input }) => {
-      // Ensure user is authenticated
-      const session = await getServerSession(authOptions);
-      if (!session) {
-        throw new TRPCError({
-          code: "UNAUTHORIZED",
-          message: "You must be logged in to create a base",
-        });
-      }
+      const session = await validateSession();
 
-      // Create base, table, columns, and rows in a transaction
-      return ctx.db.$transaction(async (tx) => {
-        // Increase the timeout for the transaction
-        await tx.$executeRaw`SET LOCAL statement_timeout = '10000';`; // Set to 10 seconds
+      return ctx.db.$transaction(
+        async (tx) => {
+          await tx.$executeRaw`SET LOCAL statement_timeout = '15000';`;
 
-        const base = await tx.base.create({
-          data: {
-            name: input.name,
-            userId: session.user.id,
-          },
-        });
+          const base = await tx.base.create({
+            data: { name: input.name, userId: session.user.id },
+          });
 
-        // Create initial table
-        const table = await tx.table.create({
-          data: {
-            name: "Table 1",
-            baseId: base.id,
-          },
-        });
+          const table = await tx.table.create({
+            data: { name: "Table 1", baseId: base.id },
+          });
 
-        // Create two initial columns
-        const columns = await Promise.all([
-          tx.column.create({
-            data: {
+          await tx.column.createMany({
+            data: Array(2).fill({
               name: "Untitled Column",
               tableId: table.id,
               type: "Text",
-            },
-          }),
-          tx.column.create({
-            data: {
-              name: "Untitled Column",
-              tableId: table.id,
-              type: "Text",
-            },
-          }),
-        ]);
+            }),
+          });
 
-        // Create four initial rows with empty cells
-        await Promise.all(
-          Array.from({ length: 4 }).map(async () => {
-            const row = await tx.row.create({
-              data: {
-                tableId: table.id,
-              },
-            });
+          const columnIds = await tx.column.findMany({
+            where: { tableId: table.id },
+            select: { id: true },
+          });
 
-            // Create empty cells for each column
-            await tx.cell.createMany({
-              data: columns.map((column) => ({
+          await tx.row.createMany({
+            data: Array(4).fill({ tableId: table.id }),
+          });
+
+          const rowIds = await tx.row.findMany({
+            where: { tableId: table.id },
+            select: { id: true },
+          });
+
+          await tx.cell.createMany({
+            data: rowIds.flatMap((row) =>
+              columnIds.map((col) => ({
                 rowId: row.id,
-                columnId: column.id,
+                columnId: col.id,
                 valueText: "",
               })),
-            });
-          }),
-        );
+            ),
+          });
 
-        return base;
-      });
+          return base;
+        },
+        { timeout: 15000 },
+      );
     }),
 
-  // New procedure to fetch bases
   getAll: publicProcedure.query(async ({ ctx }) => {
-    // Ensure user is authenticated
-    const session = await getServerSession(authOptions);
-    if (!session) {
-      throw new TRPCError({
-        code: "UNAUTHORIZED",
-        message: "You must be logged in to fetch bases",
-      });
-    }
+    const session = await validateSession();
 
-    // Fetch bases along with their associated table IDs
     return ctx.db.base.findMany({
-      where: {
-        userId: session.user.id,
-      },
-      include: {
-        tables: {
-          select: {
-            id: true,
-          },
-        },
-      },
+      where: { userId: session.user.id },
+      include: { tables: { select: { id: true } } },
     });
   }),
 
   delete: publicProcedure
-    .input(
-      z.object({
-        id: z.string(),
-      }),
-    )
+    .input(z.object({ id: z.string() }))
     .mutation(async ({ ctx, input }) => {
-      const session = await getServerSession(authOptions);
-      if (!session) {
-        throw new TRPCError({
-          code: "UNAUTHORIZED",
-          message: "You must be logged in to delete a base",
-        });
-      }
-      const base = await ctx.db.base.findUnique({
-        where: { id: input.id },
-      });
-
-      if (!base || base.userId !== session.user.id) {
-        throw new TRPCError({
-          code: "FORBIDDEN",
-          message: "You do not have permission to delete this base",
-        });
-      }
+      const session = await validateSession();
+      await validateBaseOwnership(ctx.db, input.id, session.user.id);
 
       return ctx.db.base.delete({
         where: { id: input.id },
       });
     }),
+
   fetchById: publicProcedure
     .input(z.object({ id: z.string() }))
     .query(async ({ ctx, input }) => {
-      const session = await getServerSession(authOptions);
-      if (!session) {
-        throw new TRPCError({
-          code: "UNAUTHORIZED",
-          message: "You must be logged in to fetch this base",
-        });
-      }
-
-      const base = await ctx.db.base.findUnique({
-        where: { id: input.id },
-      });
-
-      // Check if base exists and belongs to the user
-      if (!base || base.userId !== session.user.id) {
-        throw new TRPCError({
-          code: "FORBIDDEN",
-          message: "You do not have permission to access this base",
-        });
-      }
-
-      return base;
+      const session = await validateSession();
+      return validateBaseOwnership(ctx.db, input.id, session.user.id);
     }),
 });

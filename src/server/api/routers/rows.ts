@@ -1,47 +1,73 @@
-import { TRPCError } from "@trpc/server";
-import { getServerSession } from "next-auth";
+import { ColumnType } from "@prisma/client";
 import { z } from "zod";
 import { createTRPCRouter, publicProcedure } from "~/server/api/trpc";
-import { authOptions } from "~/server/auth";
+
+// First, define the expected types
+type Cell = {
+  id: string;
+  columnId: string;
+  rowId: string;
+  valueText: string | null;
+  valueNumber: number | null;
+  createdAt: Date;
+  updatedAt: Date;
+  column: {
+    id: string;
+    tableId: string;
+    name: string;
+    type: ColumnType;
+    createdAt: Date;
+    updatedAt: Date;
+  };
+};
 
 export const rowsRouter = createTRPCRouter({
   create: publicProcedure
     .input(z.object({ tableId: z.string() }))
     .mutation(async ({ ctx, input }) => {
-      const session = await getServerSession(authOptions);
-      if (!session) throw new TRPCError({ code: "UNAUTHORIZED" });
-
-      const table = await ctx.db.table.findUnique({
-        where: { id: input.tableId },
-      });
-
-      if (!table) {
-        throw new TRPCError({
-          code: "NOT_FOUND",
-          message: "Table not found",
+      return ctx.db.$transaction(async (tx) => {
+        const columns = await tx.column.findMany({
+          where: { tableId: input.tableId },
         });
-      }
-
-      return ctx.db.row.create({
-        data: { tableId: input.tableId },
-        include: {
-          cells: { include: { column: true } },
-        },
+        const row = await tx.row.create({
+          data: {
+            tableId: input.tableId,
+            cells: {
+              create: columns.map((column) => ({
+                columnId: column.id,
+                valueText: null,
+                valueNumber: null,
+              })),
+            },
+          },
+          include: {
+            cells: {
+              include: {
+                column: true,
+              },
+            },
+          },
+        });
+        return row;
       });
     }),
 
   getByTableId: publicProcedure
     .input(z.object({ tableId: z.string() }))
     .query(async ({ ctx, input }) => {
-      const session = await getServerSession(authOptions);
-      if (!session) throw new TRPCError({ code: "UNAUTHORIZED" });
-
-      return ctx.db.row.findMany({
+      const rows = await ctx.db.row.findMany({
         where: { tableId: input.tableId },
         include: {
-          cells: { include: { column: true } },
+          cells: {
+            include: {
+              column: true,
+            },
+          },
         },
-        orderBy: { createdAt: "desc" },
+        orderBy: {
+          createdAt: "asc",
+        },
       });
+      return rows;
     }),
 });

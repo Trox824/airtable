@@ -1,11 +1,11 @@
 "use client";
 
 import { Table } from "@prisma/client";
-import Link from "next/link";
 import { useState, useEffect } from "react";
 import { api } from "~/trpc/react";
 import React from "react";
 import { useRouter } from "next/navigation";
+import type { ColumnDef, ColumnResizeMode } from "@tanstack/react-table";
 
 interface TableTabsProps {
   currentTableId: string;
@@ -15,21 +15,29 @@ export function TableTabs({ currentTableId, baseId }: TableTabsProps) {
   const { data: tables } = api.tables.getByBaseId.useQuery({ baseId });
   const [isCreating, setIsCreating] = useState(false);
   const [newTableName, setNewTableName] = useState("");
-  const [localTables, setLocalTables] = useState<Table[]>(tables ?? []);
+  const [localTables, setLocalTables] = useState<Table[]>(
+    tables?.map((table) => ({
+      ...table,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    })) ?? [],
+  );
   const [selectedTableId, setCurrentTableId] = useState<string>(currentTableId);
   const utils = api.useUtils();
   const createTable = api.tables.create.useMutation({
     onMutate: async (newTable) => {
-      // Create a temporary table
+      // Generate a unique ID once
+      const tempTableId = `temp-${new Date().getTime()}`;
+
       const tempTable: Table = {
-        id: `temp-${Date.now()}`,
+        id: tempTableId,
         name: newTable.name,
         baseId: newTable.baseId,
         createdAt: new Date(),
         updatedAt: new Date(),
       };
 
-      // Optimistically add the temp table to the local state
+      // Add the temp table to the end of the list
       setLocalTables((prev) => [...prev, tempTable]);
       setCurrentTableId(tempTable.id);
       setIsCreating(false);
@@ -96,7 +104,13 @@ export function TableTabs({ currentTableId, baseId }: TableTabsProps) {
 
   // Update localTables when tables prop changes
   useEffect(() => {
-    setLocalTables(tables ?? []);
+    setLocalTables(
+      tables?.map((table) => ({
+        ...table,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      })) ?? [],
+    );
   }, [tables]);
 
   return (
@@ -119,7 +133,7 @@ export function TableTabs({ currentTableId, baseId }: TableTabsProps) {
             <div
               key={table.id}
               onClick={() => handleTableClick(table.id)}
-              className={`h-full cursor-pointer bg-teal-500 [background:linear-gradient(rgba(0,0,0,0.1),rgba(0,0,0,0.1)),rgb(20,184,166)] ${
+              className={`-ml-[1px] h-full cursor-pointer bg-teal-500 [background:linear-gradient(rgba(0,0,0,0.1),rgba(0,0,0,0.1)),rgb(20,184,166)] ${
                 localTables[index] &&
                 localTables[index + 1]?.id === selectedTableId
                   ? "rounded-br-sm"
