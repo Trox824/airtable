@@ -1,8 +1,9 @@
 import { type Table, flexRender, type ColumnDef } from "@tanstack/react-table";
-import { type Row } from "./types";
+
+import { type Row, type ColumnMeta } from "./types";
 import { AddColumnDropdown } from "./Dropdown";
 import { type ColumnType } from "@prisma/client";
-import { RefObject, Dispatch, SetStateAction, useMemo } from "react";
+import { RefObject, Dispatch, SetStateAction, useMemo, useState } from "react";
 
 interface TableHeaderProps {
   table: Table<Row>;
@@ -10,6 +11,7 @@ interface TableHeaderProps {
   buttonRef: RefObject<HTMLButtonElement>;
   dropdownRef: RefObject<HTMLDivElement>;
   onCreateColumn: (name: string, type: ColumnType) => void;
+  onRenameColumn: (columnId: string, name: string) => void;
   setIsDropdownOpen: Dispatch<SetStateAction<boolean>>;
 }
 
@@ -19,8 +21,27 @@ export function TableHeader({
   buttonRef,
   dropdownRef,
   onCreateColumn,
+  onRenameColumn,
   setIsDropdownOpen,
 }: TableHeaderProps) {
+  const [editingColumnId, setEditingColumnId] = useState<string | null>(null);
+  const [editingName, setEditingName] = useState("");
+
+  const handleDoubleClick = (columnId: string) => {
+    const column = table.getAllColumns().find((col) => col.id === columnId);
+    const currentName = (column?.columnDef.meta as ColumnMeta).name ?? "";
+
+    setEditingColumnId(columnId);
+    setEditingName(currentName);
+  };
+
+  const handleRename = (columnId: string) => {
+    if (editingName.trim()) {
+      onRenameColumn(columnId, editingName.trim());
+    }
+    setEditingColumnId(null);
+  };
+
   return (
     <thead className="z-10 h-8">
       {table.getHeaderGroups().map((headerGroup) => (
@@ -39,36 +60,37 @@ export function TableHeader({
             >
               {header.isPlaceholder ? null : (
                 <div className="relative flex h-full w-full flex-grow items-center">
-                  <span
-                    className={`relative h-auto w-full overflow-hidden pl-2 text-start text-[13px] font-normal ${
-                      header.getSize() < 70 ? "truncate" : ""
-                    }`}
-                    style={{
-                      whiteSpace: "nowrap",
-                      overflow: "hidden",
-                      textOverflow: "ellipsis",
-                    }}
-                  >
-                    {flexRender(
-                      header.column.columnDef.header,
-                      header.getContext(),
-                    )}
-                  </span>
-                  <span className="flex-end relative bottom-0 right-0 top-0 flex h-full items-center pl-1 pr-1.5">
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      width="16"
-                      height="16"
-                      viewBox="0 0 16 16"
-                      className="opacity-75"
+                  {editingColumnId === header.column.id ? (
+                    <input
+                      className="m-1 h-6 w-[calc(100%-8px)] rounded border px-1 text-[13px] font-medium focus:outline-none"
+                      value={editingName}
+                      onChange={(e) => setEditingName(e.target.value)}
+                      onBlur={() => handleRename(header.column.id)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") handleRename(header.column.id);
+                        if (e.key === "Escape") setEditingColumnId(null);
+                      }}
+                      autoFocus
+                    />
+                  ) : (
+                    <span
+                      className={`relative h-auto w-full overflow-hidden pl-2 text-start text-[13px] font-normal ${
+                        header.getSize() < 70 ? "truncate" : ""
+                      }`}
+                      style={{
+                        whiteSpace: "nowrap",
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                      }}
+                      onDoubleClick={() => handleDoubleClick(header.column.id)}
                     >
-                      <use
-                        fill="currentColor"
-                        fillOpacity="0.75"
-                        href="/icons/icon_definitions.svg#ChevronDown"
-                      />
-                    </svg>
-                  </span>
+                      {flexRender(
+                        header.column.columnDef.header,
+                        header.getContext(),
+                      )}
+                    </span>
+                  )}
+                  <span className="flex-end relative bottom-0 right-0 top-0 flex h-full items-center pl-1 pr-1.5"></span>
                 </div>
               )}
               {header.column.getCanResize() && (

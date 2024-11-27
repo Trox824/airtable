@@ -3,6 +3,7 @@ import { ColumnType } from "@prisma/client";
 
 export interface ColumnMeta {
   type: ColumnType;
+  name: string;
 }
 
 // Column type

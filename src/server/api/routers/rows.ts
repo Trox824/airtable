@@ -1,6 +1,7 @@
 import { ColumnType } from "@prisma/client";
 import { z } from "zod";
 import { createTRPCRouter, publicProcedure } from "~/server/api/trpc";
+import { tablesRouter } from "./tables";
 
 // First, define the expected types
 type Cell = {
@@ -55,7 +56,8 @@ export const rowsRouter = createTRPCRouter({
   getByTableId: publicProcedure
     .input(z.object({ tableId: z.string() }))
     .query(async ({ ctx, input }) => {
-      const rows = await ctx.db.row.findMany({
+      // Return all rows with their cells
+      return ctx.db.row.findMany({
         where: { tableId: input.tableId },
         include: {
           cells: {
@@ -68,6 +70,5 @@ export const rowsRouter = createTRPCRouter({
           createdAt: "asc",
         },
       });
-      return rows;
     }),
 });

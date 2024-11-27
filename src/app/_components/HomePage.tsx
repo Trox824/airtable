@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
 import { Base } from "@prisma/client";
 import { signOut } from "next-auth/react";
+import { v4 as uuidv4 } from "uuid"; // Use this for generating UUIDs
 
 interface TableType {
   id: string;
@@ -28,12 +29,10 @@ const HomePage: React.FC = () => {
   const [localBases, setLocalBases] = useState<BaseType[]>([]);
   const router = useRouter();
   const queryClient = useQueryClient();
-  const [isLoadingBase, setIsLoadingBase] = useState(false);
   const [isOptimisticBase, setIsOptimisticBase] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   const { isLoading: apiLoading, error, data } = api.base.getAll.useQuery();
-  console.log(data);
   useEffect(() => {
     if (data) {
       const mappedData: BaseType[] = data.map((item: BaseType) => ({
@@ -50,60 +49,16 @@ const HomePage: React.FC = () => {
   }, [data]);
 
   const createBase = api.base.create.useMutation({
-    onMutate: async (newBase) => {
-      // Cancel outgoing refetches
-      await queryClient.cancelQueries({ queryKey: ["base.getAll"] });
-
-      // Keep track of optimistic base ID
-      const optimisticId = `temp-${Date.now()}`;
-      setIsOptimisticBase(optimisticId);
-
-      // Create optimistic base
-      const optimisticBase: BaseType = {
-        id: optimisticId,
-        name: newBase.name,
-        userId: "temp",
-        createdAt: new Date(),
-        updatedAt: new Date(),
-        tables: [],
-      };
-
-      // Add optimistic base to local state
-      setLocalBases((prev) => [...prev, optimisticBase]);
-      setIsCreating(false);
-      setNewBaseName("");
-
-      // Navigate to the new base page immediately
-      router.push(`/${optimisticId}`);
-      
-      return { optimisticBase };
-    },
-    onSuccess: (created, _, context) => {
-      if (context?.optimisticBase) {
-        setLocalBases((prev) =>
-          prev.map((base) =>
-            base.id === context.optimisticBase.id ? created : base,
-          ),
-        );
-      }
-      setIsOptimisticBase(null);
+    onSuccess: (createdBase) => {
+      if (!createdBase) return;
       void queryClient.invalidateQueries({ queryKey: ["base.getAll"] });
-      router.push(`/${created.id}`);
-      setIsLoadingBase(false);
-    },
-    onError: (_, __, context) => {
-      if (context?.optimisticBase) {
-        setLocalBases((prev) =>
-          prev.filter((base) => base.id !== context.optimisticBase.id),
-        );
-      }
-      setIsOptimisticBase(null);
-      setIsLoadingBase(false);
+      router.push(`/${createdBase.id}/${createdBase.firstTableId}`);
     },
   });
 
   const deleteBase = api.base.delete.useMutation({
     onMutate: async (deletedBase) => {
+      // Optimistically remove the base from the UI
       setLocalBases((prev) =>
         prev.filter((base) => base.id !== deletedBase.id),
       );
@@ -111,8 +66,12 @@ const HomePage: React.FC = () => {
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["base.getAll"] });
     },
-    onError: () => {
+    onError: (error) => {
+      // On error, refetch to restore the correct state
       void queryClient.invalidateQueries({ queryKey: ["base.getAll"] });
+      // Optionally show an error message to the user
+      console.error("Error deleting base:", error);
+      // You could add a toast notification here
     },
   });
 
@@ -122,11 +81,10 @@ const HomePage: React.FC = () => {
     }
   }, [error]);
 
-  const handleCreateBase = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (newBaseName.trim()) {
-      createBase.mutate({ name: newBaseName });
-    }
+  const handleCreateBase = async (baseName: string) => {
+    setIsCreating(true);
+    await createBase.mutateAsync({ name: baseName });
+    setIsCreating(false);
   };
 
   const handleLogout = async () => {
@@ -548,62 +506,25 @@ const HomePage: React.FC = () => {
                 {/* Create New Base Button/Form */}
                 {!isLoading && (
                   <div className="mt-1 h-24">
-                    {isCreating ? (
-                      <form
-                        onSubmit={handleCreateBase}
-                        className="shadow-at-main-nav h-full rounded-md border bg-white p-4"
+                    <button
+                      onClick={() => handleCreateBase("Untitled Base")}
+                      className="shadow-at-main-nav hover:shadow-at-main-nav-hover flex h-full w-full items-center justify-center rounded-md border bg-white"
+                    >
+                      <svg
+                        width="24"
+                        height="24"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        className="text-gray-400"
                       >
-                        <div className="flex h-full flex-col justify-between">
-                          <input
-                            autoFocus
-                            type="text"
-                            value={newBaseName}
-                            onChange={(e) => setNewBaseName(e.target.value)}
-                            placeholder="Enter base name..."
-                            className="w-full border-b border-gray-200 p-2 text-sm outline-none"
-                          />
-                          <div className="flex justify-end space-x-2">
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setIsCreating(false);
-                                setNewBaseName("");
-                              }}
-                              className="text-sm text-gray-500 hover:text-gray-700"
-                            >
-                              Cancel
-                            </button>
-                            <button
-                              type="submit"
-                              disabled={createBase.isPending}
-                              className="rounded bg-blue-500 px-3 py-1 text-sm text-white hover:bg-blue-600 disabled:opacity-50"
-                            >
-                              Create
-                            </button>
-                          </div>
-                        </div>
-                      </form>
-                    ) : (
-                      <button
-                        onClick={() => setIsCreating(true)}
-                        className="shadow-at-main-nav hover:shadow-at-main-nav-hover flex h-full w-full items-center justify-center rounded-md border bg-white"
-                      >
-                        <svg
-                          width="24"
-                          height="24"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          className="text-gray-400"
-                        >
-                          <path
-                            d="M12 4v16m8-8H4"
-                            stroke="currentColor"
-                            strokeWidth="2"
-                            strokeLinecap="round"
-                          />
-                        </svg>
-                      </button>
-                    )}
+                        <path
+                          d="M12 4v16m8-8H4"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                        />
+                      </svg>
+                    </button>
                   </div>
                 )}
               </>

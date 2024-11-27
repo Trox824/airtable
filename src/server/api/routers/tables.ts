@@ -30,49 +30,22 @@ export const tablesRouter = createTRPCRouter({
       }),
     )
     .mutation(async ({ ctx, input }) => {
+      const baseExists = await ctx.db.base.findUnique({
+        where: { id: input.baseId },
+      });
+      if (!baseExists) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Base ID not found",
+        });
+      }
       return ctx.db.$transaction(async (tx) => {
-        // Create the table
         const table = await tx.table.create({
           data: {
             baseId: input.baseId,
             name: input.name,
           },
         });
-        // Create initial columns in bulk
-        // const columns = await tx.column.createMany({
-        //   data: Array(2).fill({
-        //     name: "Untitled Column",
-        //     tableId: table.id,
-        //     type: "Text",
-        //   }),
-        // });
-        // Get the created column IDs
-        const columnIds = await tx.column.findMany({
-          where: { tableId: table.id },
-          select: { id: true },
-        });
-        // Create rows in bulk
-        await tx.row.createMany({
-          data: Array(4).fill({ tableId: table.id }),
-        });
-
-        // Get the created row IDs
-        const rowIds = await tx.row.findMany({
-          where: { tableId: table.id },
-          select: { id: true },
-        });
-
-        // Create all cells in a single bulk operation
-        await tx.cell.createMany({
-          data: rowIds.flatMap((row) =>
-            columnIds.map((col) => ({
-              rowId: row.id,
-              columnId: col.id,
-              valueText: "",
-            })),
-          ),
-        });
-
         return table;
       });
     }),
@@ -123,6 +96,14 @@ export const tablesRouter = createTRPCRouter({
       return table;
     }),
 
+  needsInitialization: publicProcedure
+    .input(z.object({ tableId: z.string() }))
+    .query(async ({ ctx, input }) => {
+      return ctx.db.table.findFirst({
+        where: { id: input.tableId },
+      });
+    }),
+
   update: publicProcedure
     .input(
       z.object({
@@ -137,5 +118,86 @@ export const tablesRouter = createTRPCRouter({
         where: { id: input.id },
         data: { name: input.name },
       });
+    }),
+
+  initialize: publicProcedure
+    .input(z.object({ tableId: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      // First validate that the table exists
+      const table = await validateTable(ctx.db, input.tableId);
+      if (!table) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Table not found",
+        });
+      }
+
+      return ctx.db.$transaction(
+        async (tx) => {
+          // Create 2 default columns in a single query
+          await tx.column.createMany({
+            data: [
+              {
+                tableId: input.tableId,
+                name: "Untitled Column",
+                type: "Text",
+              },
+              {
+                tableId: input.tableId,
+                name: "Untitled Column",
+                type: "Text",
+              },
+            ],
+          });
+
+          // Get the created columns
+          const createdColumns = await tx.column.findMany({
+            where: { tableId: input.tableId },
+            orderBy: { createdAt: "asc" },
+          });
+
+          // Create 4 rows
+          await tx.row.createMany({
+            data: Array.from({ length: 4 }).map(() => ({
+              tableId: input.tableId,
+            })),
+          });
+
+          // Get the created rows
+          const createdRows = await tx.row.findMany({
+            where: { tableId: input.tableId },
+            orderBy: { createdAt: "desc" },
+            take: 4,
+          });
+
+          await tx.cell.createMany({
+            data: createdRows.flatMap((row) =>
+              createdColumns.map((column) => ({
+                rowId: row.id,
+                columnId: column.id,
+                valueText: null,
+                valueNumber: null,
+              })),
+            ),
+          });
+
+          return {
+            columns: createdColumns,
+            rows: await tx.row.findMany({
+              where: { id: { in: createdRows.map((r) => r.id) } },
+              include: {
+                cells: {
+                  include: {
+                    column: true,
+                  },
+                },
+              },
+            }),
+          };
+        },
+        {
+          timeout: 10000, // Increase timeout to 10 seconds
+        },
+      );
     }),
 });

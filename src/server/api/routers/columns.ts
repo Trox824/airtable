@@ -49,4 +49,18 @@ export const columnsRouter = createTRPCRouter({
         },
       });
     }),
+
+  rename: publicProcedure
+    .input(
+      z.object({
+        columnId: z.string(),
+        name: z.string().min(1),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      return ctx.db.column.update({
+        where: { id: input.columnId },
+        data: { name: input.name },
+      });
+    }),
 });

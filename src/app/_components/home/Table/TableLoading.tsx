@@ -1,4 +1,4 @@
-export const TableLoading = () => (
+export const TableLoadingState = () => (
   <div className="skeleton-loader">
     <div className="flex h-screen w-full items-center justify-center">
       <div className="flex flex-col items-center gap-4">

@@ -44,8 +44,8 @@ export function TableBody({
                 }}
               >
                 {cell.column.id === "select" ? (
-                  <div className="flex h-full w-5 items-center justify-center">
-                    <span className="text-[13px] font-normal">
+                  <div className="flex h-full w-full items-center justify-center">
+                    <span className="-ml-1 text-[13px] font-normal">
                       {row.index + 1}
                     </span>
                   </div>

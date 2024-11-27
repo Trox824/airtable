@@ -3,7 +3,7 @@
 import { useState, useMemo, useRef, useEffect, useCallback } from "react";
 import { api } from "~/trpc/react";
 import { CellRenderer } from "./CellRender";
-import { TableLoading } from "./TableLoading";
+import { TableLoadingState } from "./TableLoading";
 import { TableHeader } from "./TableHeader";
 import { TableBody } from "./TableBody";
 import {
@@ -16,6 +16,8 @@ import {
 } from "@tanstack/react-table";
 import { Row, type ColumnMeta } from "./types";
 import { ColumnType } from "@prisma/client";
+import { v4 as uuidv4 } from "uuid";
+
 interface TableMeta {
   updateData: (rowIndex: number, columnId: string, value: unknown) => void;
 }
@@ -39,6 +41,7 @@ export function DataTable({ tableId }: { tableId: string }) {
   } = api.rows.getByTableId.useQuery({ tableId });
 
   const isLoading = loadingColumns || loadingRows;
+  const isNewTable = !isLoading && (!columns?.length || !rows?.length);
   const utils = api.useUtils();
 
   // Mutations
@@ -46,7 +49,7 @@ export function DataTable({ tableId }: { tableId: string }) {
     onMutate: async (newColumn) => {
       await utils.columns.getByTableId.cancel({ tableId });
       const previousColumns = utils.columns.getByTableId.getData({ tableId });
-      const id = "temp-id-" + Math.random().toString(36).substr(2, 9);
+      const id = uuidv4();
       const optimisticColumn = {
         id,
         tableId: newColumn.tableId,
@@ -81,32 +84,32 @@ export function DataTable({ tableId }: { tableId: string }) {
     console.log("Adding row");
     await utils.rows.getByTableId.cancel({ tableId });
     const previousRows = utils.rows.getByTableId.getData({ tableId });
-    const id = "temp-id-" + Math.random().toString(36).substr(2, 9);
+    const id = uuidv4();
     const emptyCells = (columns ?? []).map((column) => ({
-      id: "temp-cell-id-" + Math.random().toString(36).substr(2, 9),
+      id: "temp-cell-id-" + uuidv4(),
       valueText: null,
       valueNumber: null,
       column: {
         type: column.type,
         name: column.name,
         id: column.id,
-        createdAt: new Date(),
-        updatedAt: new Date(),
+        createdAt: new Date(0),
+        updatedAt: new Date(0),
         tableId: tableId,
         columnDef: tableColumns.find((col) => col.id === column.id) ?? null,
       },
       columnId: column.id,
       rowId: id,
-      createdAt: new Date(),
-      updatedAt: new Date(),
+      createdAt: new Date(0),
+      updatedAt: new Date(0),
     }));
 
     const optimisticRow = {
       id,
       tableId,
       cells: emptyCells,
-      createdAt: new Date(),
-      updatedAt: new Date(),
+      createdAt: new Date(0),
+      updatedAt: new Date(0),
     } as Row;
 
     utils.rows.getByTableId.setData({ tableId }, (oldRows) => [
@@ -128,6 +131,21 @@ export function DataTable({ tableId }: { tableId: string }) {
       await utils.rows.getByTableId.invalidate({ tableId });
     },
   });
+
+  // Add initialization mutation
+  const initializeTable = api.tables.initialize.useMutation({
+    onSettled: async () => {
+      await utils.columns.getByTableId.invalidate({ tableId });
+      await utils.rows.getByTableId.invalidate({ tableId });
+    },
+  });
+
+  // Add effect to handle initialization
+  useEffect(() => {
+    if (isNewTable) {
+      initializeTable.mutate({ tableId });
+    }
+  }, [isNewTable, tableId]);
 
   // Column helper and table columns
   const columnHelper = createColumnHelper<Row>();
@@ -170,20 +188,9 @@ export function DataTable({ tableId }: { tableId: string }) {
             id: column.id,
             meta: {
               type: column.type,
+              name: column.name,
             } as ColumnMeta,
-            header: () => (
-              <div className="contentWrapper">
-                <div className="flex items-center gap-2">
-                  <div className="relative" title={column.type}></div>
-                  <span className="name">
-                    <div className="flex w-full items-center justify-between">
-                      <div className="truncate-pre">{column.name}</div>
-                      <div className="flex items-center"></div>
-                    </div>
-                  </span>
-                </div>
-              </div>
-            ),
+            header: column.name,
             cell: (info) => (
               <div className="flex items-center">
                 <CellRenderer info={info} setEditing={setIsEditing} />
@@ -197,7 +204,6 @@ export function DataTable({ tableId }: { tableId: string }) {
 
   const updateCell = api.cells.update.useMutation({
     onMutate: async (newCell) => {
-      console.log("Updating cell", newCell);
       await utils.rows.getByTableId.cancel({ tableId });
       const previousRows = utils.rows.getByTableId.getData({ tableId });
 
@@ -222,6 +228,35 @@ export function DataTable({ tableId }: { tableId: string }) {
     },
   });
 
+  // Add the rename mutation near other mutations
+  const renameColumn = api.columns.rename.useMutation({
+    onMutate: async (newColumn) => {
+      await utils.columns.getByTableId.cancel({ tableId });
+      const previousColumns = utils.columns.getByTableId.getData({ tableId });
+
+      utils.columns.getByTableId.setData({ tableId }, (oldColumns) =>
+        oldColumns?.map((col) =>
+          col.id === newColumn.columnId
+            ? { ...col, name: newColumn.name }
+            : col,
+        ),
+      );
+
+      return { previousColumns };
+    },
+    onError: (err, newColumn, context) => {
+      if (context?.previousColumns) {
+        utils.columns.getByTableId.setData(
+          { tableId },
+          context.previousColumns,
+        );
+      }
+    },
+    onSettled: async () => {
+      await utils.columns.getByTableId.invalidate({ tableId });
+    },
+  });
+
   // Handlers
   const handleCreateColumn = useCallback(
     (name: string, type: ColumnType) => {
@@ -234,6 +269,14 @@ export function DataTable({ tableId }: { tableId: string }) {
   const handleAddRow = useCallback(() => {
     addRow.mutate({ tableId });
   }, [addRow, tableId]);
+
+  // Add the handler function near other handlers
+  const handleRenameColumn = useCallback(
+    (columnId: string, name: string) => {
+      renameColumn.mutate({ columnId, name });
+    },
+    [renameColumn],
+  );
 
   // Table setup
   const tableData = useMemo(
@@ -289,9 +332,15 @@ export function DataTable({ tableId }: { tableId: string }) {
   return (
     <>
       <div className="fixed bottom-0 left-0 right-0 top-[calc(theme(spacing.navbar)+2rem+theme(spacing.toolbar))] flex flex-row overflow-auto bg-[#f8f8f8]">
-        {isLoading ? (
+        {isLoading || initializeTable.isPending ? (
           <div className="flex h-full w-full items-center justify-center">
-            <TableLoading />
+            <TableLoading
+              message={
+                initializeTable.isPending
+                  ? "Initializing table..."
+                  : "Loading..."
+              }
+            />
           </div>
         ) : (
           <div className="w-fit">
@@ -305,6 +354,7 @@ export function DataTable({ tableId }: { tableId: string }) {
                 buttonRef={buttonRef}
                 dropdownRef={dropdownRef}
                 onCreateColumn={handleCreateColumn}
+                onRenameColumn={handleRenameColumn}
                 setIsDropdownOpen={setIsDropdownOpen}
               />
               <TableBody
@@ -318,5 +368,14 @@ export function DataTable({ tableId }: { tableId: string }) {
         )}
       </div>
     </>
+  );
+}
+
+export function TableLoading({ message = "Loading..." }: { message?: string }) {
+  return (
+    <div className="text-center">
+      <div className="mb-2">{message}</div>
+      <TableLoadingState />
+    </div>
   );
 }

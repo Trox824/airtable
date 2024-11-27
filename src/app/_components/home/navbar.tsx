@@ -1,12 +1,52 @@
 "use client";
 import Link from "next/link";
 import { api } from "~/trpc/react";
+import { useState } from "react";
 
 interface NavbarProps {
   BaseId: string;
 }
 
 export function Navbar({ BaseId }: NavbarProps) {
+  const isOptimistic = BaseId.startsWith("temp");
+  const [newBaseName, setNewBaseName] = useState("newBaseName");
+  const [isEditing, setIsEditing] = useState(false);
+  const [optimisticName, setOptimisticName] = useState<string | null>(null);
+
+  const utils = api.useContext();
+  const updateBaseMutation = api.base.update.useMutation({
+    onMutate: async ({ name }) => {
+      await utils.base.fetchById.cancel({ id: BaseId });
+      const previousBase = utils.base.fetchById.getData({ id: BaseId });
+      utils.base.fetchById.setData({ id: BaseId }, (old) => ({
+        ...old!,
+        name: name,
+      }));
+      return { previousBase };
+    },
+    onError: (err, newData, context) => {
+      utils.base.fetchById.setData(
+        { id: BaseId },
+        context?.previousBase ?? null,
+      );
+    },
+    onSettled: async () => {
+      await utils.base.fetchById.invalidate({ id: BaseId });
+    },
+  });
+
+  const handleUpdateBaseName = async (
+    e: React.KeyboardEvent<HTMLInputElement>,
+  ) => {
+    if (e.key === "Enter" && newBaseName.trim()) {
+      setIsEditing(false);
+      updateBaseMutation.mutate({
+        id: BaseId,
+        name: newBaseName.trim(),
+      });
+    }
+  };
+
   const {
     data: base,
     isLoading,
@@ -14,16 +54,17 @@ export function Navbar({ BaseId }: NavbarProps) {
   } = api.base.fetchById.useQuery(
     { id: BaseId },
     {
-      retry: false,
-      enabled: !!BaseId,
+      retry: true,
     },
   );
 
-  const baseName = isLoading
-    ? "Loading..."
-    : error
-      ? "Error fetching base"
-      : (base?.name ?? "Not Found");
+  const baseName = isOptimistic
+    ? "Creating new base..."
+    : isLoading
+      ? "Untitled Base"
+      : error
+        ? "Error fetching base"
+        : (optimisticName ?? base?.name ?? "Untitled Base");
 
   return (
     <header className="fixed left-0 right-0 top-0 z-50 flex h-navbar bg-teal-500 pl-5 pr-4 text-white">
@@ -58,12 +99,24 @@ export function Navbar({ BaseId }: NavbarProps) {
           </div>
           <div className="group group-hover:opacity-100"></div>
           <div className="flex flex-row items-center">
-            <span className="mr-1 text-[17px] font-semibold">{baseName}</span>
+            {isEditing ? (
+              <input
+                type="text"
+                value={newBaseName}
+                onChange={(e) => setNewBaseName(e.target.value)}
+                onKeyDown={handleUpdateBaseName}
+                className="w-full bg-transparent"
+                autoFocus
+              />
+            ) : (
+              <span className="mr-1 text-[17px] font-semibold">{baseName}</span>
+            )}
             <svg
               width="16"
               height="16"
               viewBox="0 0 16 16"
               className="icon fill-at-half-black/70 flex-none"
+              onClick={() => setIsEditing(true)}
             >
               <path
                 fill="currentColor"
@@ -99,19 +152,7 @@ export function Navbar({ BaseId }: NavbarProps) {
 
         {/* Right section with icons and profile */}
         <div className="flex flex-1 items-center justify-end">
-          <div className="flex h-7 cursor-pointer flex-row items-center rounded-full px-3 text-black/65 hover:bg-black/10">
-            <svg
-              width="16"
-              height="16"
-              viewBox="0 0 16 16"
-              className="icon flex-none"
-            >
-              <path
-                fill="#FFFFFF"
-                d="M8 1.5a6.5 6.5 0 1 0 0 13 6.5 6.5 0 0 0 0-13zM0 8a8 8 0 1 1 16 0A8 8 0 0 1 0 8zm7.25-4v4.5l3.5 2-0.75 1.25-4-2.25V4h1.25z"
-              />
-            </svg>
-          </div>
+          <div className="flex h-7 cursor-pointer flex-row items-center rounded-full px-3 text-black/65 hover:bg-black/10"></div>
           <div className="flex h-7 cursor-pointer flex-row items-center rounded-full px-3 text-[13px] font-normal text-white hover:bg-black/10">
             <svg
               width="16"

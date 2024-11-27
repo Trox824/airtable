@@ -5,70 +5,99 @@ import { useState, useEffect } from "react";
 import { api } from "~/trpc/react";
 import React from "react";
 import { useRouter } from "next/navigation";
-import type { ColumnDef, ColumnResizeMode } from "@tanstack/react-table";
+import { v4 as uuidv4 } from "uuid";
 
 interface TableTabsProps {
-  currentTableId: string;
   baseId: string;
+  tableId: string;
 }
-export function TableTabs({ currentTableId, baseId }: TableTabsProps) {
-  const { data: tables } = api.tables.getByBaseId.useQuery({ baseId });
+
+interface TableWithCount {
+  id: string;
+  name: string;
+  baseId: string;
+  _count: {
+    columns: number;
+    rows: number;
+  };
+}
+
+export function TableTabs({ baseId, tableId }: TableTabsProps) {
+  const router = useRouter();
+  const { data: tables = [] } = api.tables.getByBaseId.useQuery<
+    TableWithCount[]
+  >({ baseId });
+
   const [isCreating, setIsCreating] = useState(false);
   const [newTableName, setNewTableName] = useState("");
-  const [localTables, setLocalTables] = useState<Table[]>(
-    tables?.map((table) => ({
-      ...table,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    })) ?? [],
-  );
-  const [selectedTableId, setCurrentTableId] = useState<string>(currentTableId);
+  const [selectedTableId, setSelectedTableId] = useState<string>(tableId);
+
   const utils = api.useUtils();
+
+  // Mutation to create a table with optimistic update
   const createTable = api.tables.create.useMutation({
     onMutate: async (newTable) => {
-      // Generate a unique ID once
-      const tempTableId = `temp-${new Date().getTime()}`;
+      await utils.tables.getByBaseId.cancel({ baseId });
 
-      const tempTable: Table = {
+      const previousTables = utils.tables.getByBaseId.getData({ baseId });
+
+      const tempTableId = uuidv4();
+      const tempTable: TableWithCount = {
         id: tempTableId,
         name: newTable.name,
         baseId: newTable.baseId,
-        createdAt: new Date(),
-        updatedAt: new Date(),
+        _count: {
+          columns: 0,
+          rows: 0,
+        },
       };
 
-      // Add the temp table to the end of the list
-      setLocalTables((prev) => [...prev, tempTable]);
-      setCurrentTableId(tempTable.id);
+      utils.tables.getByBaseId.setData(
+        { baseId },
+        (old: TableWithCount[] = []) => [...old, tempTable],
+      );
+
+      setSelectedTableId(tempTable.id);
       setIsCreating(false);
 
-      return { tempTable };
+      // Navigate immediately with the temp ID
+      router.push(`/${baseId}/${tempTableId}`);
+
+      return { previousTables, tempTableId };
     },
-    onSuccess: (created, _, context) => {
-      if (context?.tempTable) {
-        // Replace the temp table with the real one
-        setLocalTables((prev) =>
-          prev.map((table) =>
-            table.id === context.tempTable.id ? created : table,
+    onSuccess: (createdTable, _, context) => {
+      // Update the cache with the real table ID
+      utils.tables.getByBaseId.setData(
+        { baseId },
+        (old: TableWithCount[] | undefined) =>
+          old?.map((table) =>
+            table.id === context?.tempTableId
+              ? {
+                  id: createdTable.id,
+                  name: createdTable.name,
+                  baseId: createdTable.baseId,
+                  _count: {
+                    columns: 0,
+                    rows: 0,
+                  },
+                }
+              : table,
           ),
-        );
-        setCurrentTableId(created.id);
-      }
-      void utils.tables.getByBaseId.invalidate({ baseId });
+      );
+
+      // Replace the URL with the real table ID
+      router.replace(`/${baseId}/${createdTable.id}`);
     },
-    onError: (_, __, context) => {
-      if (context?.tempTable) {
-        // Remove the temp table if the creation failed
-        setLocalTables((prev) =>
-          prev.filter((table) => table.id !== context.tempTable.id),
-        );
+    onError: (error, _, context) => {
+      if (context?.previousTables) {
+        utils.tables.getByBaseId.setData({ baseId }, context.previousTables);
       }
+      console.error("Error creating table:", error);
     },
   });
 
-  const router = useRouter();
-
   const handleCreateTable = () => {
+    if (isCreating) return;
     setIsCreating(true);
   };
 
@@ -82,63 +111,43 @@ export function TableTabs({ currentTableId, baseId }: TableTabsProps) {
   };
 
   const handleTableClick = (tableId: string) => {
-    setCurrentTableId(tableId);
+    setSelectedTableId(tableId);
     router.push(`/${baseId}/${tableId}`);
   };
 
-  // Load the cached table ID on component mount
   useEffect(() => {
     const cachedTableId = localStorage.getItem(`selectedTable-${baseId}`);
-    if (
-      cachedTableId &&
-      localTables.some((table) => table.id === cachedTableId)
-    ) {
-      setCurrentTableId(cachedTableId);
+    if (cachedTableId && tables.some((table) => table.id === cachedTableId)) {
+      setSelectedTableId(cachedTableId);
     }
-  }, [baseId, localTables]);
+  }, [baseId, tables]);
 
-  // Update localStorage when table selection changes
   useEffect(() => {
     localStorage.setItem(`selectedTable-${baseId}`, selectedTableId);
   }, [selectedTableId, baseId]);
-
-  // Update localTables when tables prop changes
-  useEffect(() => {
-    setLocalTables(
-      tables?.map((table) => ({
-        ...table,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      })) ?? [],
-    );
-  }, [tables]);
 
   return (
     <div className="fixed left-0 right-0 top-navbar z-40 h-8 bg-teal-500 text-white">
       <div className="flex h-8 flex-row justify-between">
         {/* Left side content */}
         <div className="flex w-full flex-row items-center overflow-scroll rounded-tr-lg bg-white [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-          {/* Active tab */}
+          {/* Active tab indicator */}
           <div
             className={`h-full w-3 ${
-              localTables.length > 1 &&
-              localTables[0] &&
-              selectedTableId === localTables[0].id
+              tables.length > 1 && tables[0] && selectedTableId === tables[0].id
                 ? "rounded-br-sm"
                 : ""
             } bg-teal-500 [background:linear-gradient(rgba(0,0,0,0.1),rgba(0,0,0,0.1)),rgb(20,184,166)]`}
           ></div>
 
-          {localTables.map((table, index) => (
+          {tables.map((table, index) => (
             <div
               key={table.id}
               onClick={() => handleTableClick(table.id)}
               className={`-ml-[1px] h-full cursor-pointer bg-teal-500 [background:linear-gradient(rgba(0,0,0,0.1),rgba(0,0,0,0.1)),rgb(20,184,166)] ${
-                localTables[index] &&
-                localTables[index + 1]?.id === selectedTableId
+                tables[index] && tables[index + 1]?.id === selectedTableId
                   ? "rounded-br-sm"
-                  : localTables[index] &&
-                      localTables[index - 1]?.id === selectedTableId
+                  : tables[index] && tables[index - 1]?.id === selectedTableId
                     ? "rounded-bl-sm"
                     : ""
               }`}
@@ -171,14 +180,12 @@ export function TableTabs({ currentTableId, baseId }: TableTabsProps) {
               </div>
             </div>
           ))}
-
-          {/* Search all tables button */}
           <div
             tabIndex={0}
             role="button"
             aria-label="Search all tables"
             className={`pointer focus-visible-opaque focus-container flex h-full flex-none cursor-pointer items-center justify-center ${
-              selectedTableId === localTables[localTables.length - 1]?.id
+              selectedTableId === tables[tables.length - 1]?.id
                 ? "rounded-bl-sm"
                 : ""
             } bg-teal-500 px-1.5 [background:linear-gradient(rgba(0,0,0,0.1),rgba(0,0,0,0.1)),rgb(20,184,166)]`}
@@ -193,8 +200,6 @@ export function TableTabs({ currentTableId, baseId }: TableTabsProps) {
               <path d="M4 6l4 4 4-4H4z" fill="currentColor" />
             </svg>
           </div>
-
-          {/* Modified Add or import section */}
           <div className="h-5"></div>
           {isCreating ? (
             <form
@@ -232,18 +237,16 @@ export function TableTabs({ currentTableId, baseId }: TableTabsProps) {
                 >
                   <path d="M8 1v14M1 8h14" />
                 </svg>
-                {localTables.length === 1 && (
+                {tables.length === 0 && (
                   <p className="text-[13px] font-normal">Add or import</p>
                 )}
               </span>
             </div>
           )}
-
-          {/* New div to take up remaining space */}
           <div className="h-full flex-grow rounded-tr-lg bg-teal-500 [background:linear-gradient(rgba(0,0,0,0.1),rgba(0,0,0,0.1)),rgb(20,184,166)]"></div>
         </div>
+
         <div className="w-2"></div>
-        {/* Right side content */}
         <div className="flex flex-row">
           <div className="pointer flex h-8 items-center rounded-tl-[8px] bg-black/10 px-4">
             <div className="flex items-center">
