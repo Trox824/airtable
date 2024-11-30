@@ -48,6 +48,6 @@ export interface Row {
 
 declare module "@tanstack/react-table" {
   interface TableMeta<TData> {
-    updateData: (rowIndex: number, columnId: string, value: unknown) => void;
+    updateData: (rowIndex: number, cellId: string, value: unknown) => void;
   }
 }

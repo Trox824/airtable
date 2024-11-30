@@ -21,23 +21,76 @@ export const baseRouter = createTRPCRouter({
     .input(z.object({ name: z.string().min(1).max(50) }))
     .mutation(async ({ ctx, input }) => {
       const session = await validateSession();
-      const base = await ctx.db.base.create({
-        data: { name: input.name, userId: session.user.id },
-      });
 
-      const table = await ctx.db.table.create({
-        data: {
-          baseId: base.id,
-          name: "Untitled Table",
+      return ctx.db.$transaction(
+        async (tx) => {
+          // Create base
+          const base = await tx.base.create({
+            data: { name: input.name, userId: session.user.id },
+          });
+
+          // Create table
+          const table = await tx.table.create({
+            data: {
+              baseId: base.id,
+              name: "Untitled Table",
+            },
+          });
+
+          // Create two columns
+          const columns = await tx.column.createMany({
+            data: [
+              {
+                tableId: table.id,
+                name: "Text Column",
+                type: "Text",
+              },
+              {
+                tableId: table.id,
+                name: "Number Column",
+                type: "Number",
+              },
+            ],
+          });
+
+          // Get the created columns to access their IDs
+          const createdColumns = await tx.column.findMany({
+            where: { tableId: table.id },
+          });
+
+          // Create two rows
+          const rows = await tx.row.createMany({
+            data: [{ tableId: table.id }, { tableId: table.id }],
+          });
+
+          // Get the created rows to access their IDs
+          const createdRows = await tx.row.findMany({
+            where: { tableId: table.id },
+          });
+
+          // Create cells for each row-column combination
+          await tx.cell.createMany({
+            data: createdRows.flatMap((row) =>
+              createdColumns.map((column) => ({
+                rowId: row.id,
+                columnId: column.id,
+                valueText: column.type === "Text" ? "" : null,
+                valueNumber: column.type === "Number" ? null : null,
+              })),
+            ),
+          });
+
+          return {
+            id: base.id,
+            name: base.name,
+            firstTableId: table.id,
+            tables: [table.name],
+          };
         },
-      });
-
-      return {
-        id: base.id,
-        name: base.name,
-        firstTableId: table.id,
-        tables: [table.name],
-      };
+        {
+          timeout: 30000,
+        },
+      );
     }),
 
   getAll: publicProcedure.query(async ({ ctx }) => {
@@ -54,8 +107,6 @@ export const baseRouter = createTRPCRouter({
       },
     });
   }),
-
-  // ... existing code ...
 
   delete: publicProcedure
     .input(z.object({ id: z.string() }))

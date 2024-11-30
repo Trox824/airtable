@@ -1,6 +1,30 @@
-export default function Toolbar() {
+"use client";
+import { useState } from "react";
+
+interface ToolbarProps {
+  handleSearch: (query: string) => void;
+}
+
+export default function Toolbar({ handleSearch }: ToolbarProps) {
+  const [isSearchVisible, setIsSearchVisible] = useState(false);
+  const [searchValue, setSearchValue] = useState("");
+
+  const toggleSearch = () => {
+    setIsSearchVisible(!isSearchVisible);
+    if (isSearchVisible) {
+      setSearchValue("");
+      handleSearch("");
+    }
+  };
+
+  const onSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setSearchValue(value);
+    handleSearch(value);
+  };
+
   return (
-    <div className="h-toolbar fixed left-0 right-0 top-[calc(theme(spacing.navbar)+2rem)] z-30 flex w-full items-center justify-between border-b border-gray-300 bg-white px-1 py-[5px] text-xs text-gray-700">
+    <div className="fixed left-0 right-0 top-[calc(theme(spacing.navbar)+2rem)] z-30 flex h-toolbar w-full items-center justify-between border-b border-gray-300 bg-white px-1 py-[5px] text-xs text-gray-700">
       <div className="flex items-center gap-x-3">
         <button className="flex cursor-pointer items-center gap-x-2 rounded-sm border border-gray-200/10 p-2 hover:bg-gray-200/60">
           <svg
@@ -24,6 +48,7 @@ export default function Toolbar() {
           </svg>
           <div>View</div>
         </button>
+        <div>|</div>
         <button className="flex cursor-pointer items-center gap-x-2 rounded-sm p-2 hover:bg-gray-200/60">
           <svg
             xmlns="http://www.w3.org/2000/svg"
@@ -43,7 +68,7 @@ export default function Toolbar() {
           </svg>
           <div>Grid View</div>
         </button>
-        <div>|</div>
+
         <div className="flex cursor-pointer items-center gap-x-2 rounded-sm p-2 hover:bg-gray-200/60">
           <svg
             xmlns="http://www.w3.org/2000/svg"
@@ -203,7 +228,12 @@ export default function Toolbar() {
           </svg>
           <div>Share</div>
         </button>
-        <button className="flex cursor-pointer items-center gap-x-2 rounded-sm p-2 hover:bg-gray-200/60">
+      </div>
+      <div className="relative">
+        <button
+          className="flex cursor-pointer items-center gap-x-2 rounded-sm p-2 hover:bg-gray-200/60"
+          onClick={toggleSearch}
+        >
           <svg
             xmlns="http://www.w3.org/2000/svg"
             width="16"
@@ -219,8 +249,39 @@ export default function Toolbar() {
             <circle cx="11" cy="11" r="8"></circle>
             <path d="m21 21-4.3-4.3"></path>
           </svg>
-          <div>Search</div>
         </button>
+        {isSearchVisible && (
+          <div className="absolute right-0 top-full mt-1 flex w-[300px] items-center">
+            <input
+              type="text"
+              value={searchValue}
+              placeholder="Search..."
+              className="w-full rounded border-2 border-gray-300 p-2 shadow focus:outline-none focus:ring-2 focus:ring-blue-500"
+              onChange={onSearchChange}
+              autoFocus
+            />
+            <button
+              onClick={toggleSearch}
+              className="absolute right-2 top-1/2 -translate-y-1/2 cursor-pointer p-1 hover:text-gray-600"
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className="lucide lucide-x"
+              >
+                <path d="M18 6 6 18" />
+                <path d="m6 6 12 12" />
+              </svg>
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );

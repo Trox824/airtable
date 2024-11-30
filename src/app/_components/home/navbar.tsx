@@ -36,9 +36,15 @@ export function Navbar({ BaseId }: NavbarProps) {
   });
 
   const handleUpdateBaseName = async (
-    e: React.KeyboardEvent<HTMLInputElement>,
+    e:
+      | React.KeyboardEvent<HTMLInputElement>
+      | React.FocusEvent<HTMLInputElement>,
   ) => {
-    if (e.key === "Enter" && newBaseName.trim()) {
+    if ("key" in e && e.key !== "Enter") {
+      return;
+    }
+
+    if (newBaseName.trim()) {
       setIsEditing(false);
       updateBaseMutation.mutate({
         id: BaseId,
@@ -98,14 +104,15 @@ export function Navbar({ BaseId }: NavbarProps) {
             </Link>
           </div>
           <div className="group group-hover:opacity-100"></div>
-          <div className="flex flex-row items-center">
+          <div className="flex w-fit flex-row items-center">
             {isEditing ? (
               <input
                 type="text"
                 value={newBaseName}
                 onChange={(e) => setNewBaseName(e.target.value)}
                 onKeyDown={handleUpdateBaseName}
-                className="w-full bg-transparent"
+                onBlur={handleUpdateBaseName}
+                className="w-40 border-none bg-transparent"
                 autoFocus
               />
             ) : (

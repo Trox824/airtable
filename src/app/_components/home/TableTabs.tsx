@@ -1,17 +1,16 @@
 "use client";
 
 import { Table } from "@prisma/client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { api } from "~/trpc/react";
 import React from "react";
 import { useRouter } from "next/navigation";
 import { v4 as uuidv4 } from "uuid";
-
+import { AddTableDropdown } from "./Table/AddTableDropdown";
 interface TableTabsProps {
   baseId: string;
   tableId: string;
 }
-
 interface TableWithCount {
   id: string;
   name: string;
@@ -21,7 +20,6 @@ interface TableWithCount {
     rows: number;
   };
 }
-
 export function TableTabs({ baseId, tableId }: TableTabsProps) {
   const router = useRouter();
   const { data: tables = [] } = api.tables.getByBaseId.useQuery<
@@ -31,16 +29,37 @@ export function TableTabs({ baseId, tableId }: TableTabsProps) {
   const [isCreating, setIsCreating] = useState(false);
   const [newTableName, setNewTableName] = useState("");
   const [selectedTableId, setSelectedTableId] = useState<string>(tableId);
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+
+  const dropdownRef = useRef<HTMLDivElement>(null);
+  const buttonRef = useRef<HTMLButtonElement>(null);
 
   const utils = api.useUtils();
+
+  // New useEffect to handle clicks outside the dropdown
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        dropdownRef.current &&
+        buttonRef.current &&
+        !dropdownRef.current.contains(event.target as Node) &&
+        !buttonRef.current.contains(event.target as Node)
+      ) {
+        setIsDropdownOpen(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [dropdownRef, buttonRef]);
 
   // Mutation to create a table with optimistic update
   const createTable = api.tables.create.useMutation({
     onMutate: async (newTable) => {
       await utils.tables.getByBaseId.cancel({ baseId });
-
       const previousTables = utils.tables.getByBaseId.getData({ baseId });
-
       const tempTableId = uuidv4();
       const tempTable: TableWithCount = {
         id: tempTableId,
@@ -51,7 +70,6 @@ export function TableTabs({ baseId, tableId }: TableTabsProps) {
           rows: 0,
         },
       };
-
       utils.tables.getByBaseId.setData(
         { baseId },
         (old: TableWithCount[] = []) => [...old, tempTable],
@@ -62,7 +80,6 @@ export function TableTabs({ baseId, tableId }: TableTabsProps) {
 
       // Navigate immediately with the temp ID
       router.push(`/${baseId}/${tempTableId}`);
-
       return { previousTables, tempTableId };
     },
     onSuccess: (createdTable, _, context) => {
@@ -84,8 +101,6 @@ export function TableTabs({ baseId, tableId }: TableTabsProps) {
               : table,
           ),
       );
-
-      // Replace the URL with the real table ID
       router.replace(`/${baseId}/${createdTable.id}`);
     },
     onError: (error, _, context) => {
@@ -97,8 +112,7 @@ export function TableTabs({ baseId, tableId }: TableTabsProps) {
   });
 
   const handleCreateTable = () => {
-    if (isCreating) return;
-    setIsCreating(true);
+    setIsDropdownOpen(true);
   };
 
   const handleSubmitNewTable = (e: React.FormEvent) => {
@@ -161,7 +175,7 @@ export function TableTabs({ baseId, tableId }: TableTabsProps) {
                   className={`max-w-[200px] truncate text-[13px] font-medium ${
                     selectedTableId !== table.id
                       ? "text-white"
-                      : "text-gray-900"
+                      : "text-gray-700"
                   }`}
                 >
                   {table.name}
@@ -201,47 +215,40 @@ export function TableTabs({ baseId, tableId }: TableTabsProps) {
             </svg>
           </div>
           <div className="h-5"></div>
-          {isCreating ? (
-            <form
-              onSubmit={handleSubmitNewTable}
-              className="flex h-full items-center bg-teal-500 px-2 [background:linear-gradient(rgba(0,0,0,0.1),rgba(0,0,0,0.1)),rgb(20,184,166)]"
-            >
-              <input
-                type="text"
-                value={newTableName}
-                onChange={(e) => setNewTableName(e.target.value)}
-                placeholder="Table name"
-                className="h-6 w-32 rounded px-2 text-sm text-gray-900"
-                autoFocus
-                onBlur={() => {
-                  if (!newTableName.trim()) {
-                    setIsCreating(false);
-                  }
-                }}
-              />
-            </form>
-          ) : (
-            <div
-              onClick={handleCreateTable}
-              className="flex h-full cursor-pointer items-center bg-teal-500 px-2 [background:linear-gradient(rgba(0,0,0,0.1),rgba(0,0,0,0.1)),rgb(20,184,166)]"
-            >
-              <span className="flex cursor-pointer flex-row items-center">
-                <svg
-                  width="12"
-                  height="12"
-                  viewBox="0 0 16 16"
-                  className="mr-1 stroke-white"
-                  xmlns="http://www.w3.org/2000/svg"
-                  strokeWidth="2"
-                  fill="none"
-                >
-                  <path d="M8 1v14M1 8h14" />
-                </svg>
-                {tables.length === 0 && (
-                  <p className="text-[13px] font-normal">Add or import</p>
-                )}
-              </span>
-            </div>
+          <div
+            onClick={handleCreateTable}
+            ref={buttonRef as unknown as React.RefObject<HTMLDivElement>}
+            className="relative flex h-full cursor-pointer items-center bg-teal-500 px-2 [background:linear-gradient(rgba(0,0,0,0.1),rgba(0,0,0,0.1)),rgb(20,184,166)]"
+          >
+            <span className="flex cursor-pointer flex-row items-center">
+              <svg
+                width="12"
+                height="12"
+                viewBox="0 0 16 16"
+                className="mr-1 stroke-white"
+                xmlns="http://www.w3.org/2000/svg"
+                strokeWidth="2"
+                fill="none"
+              >
+                <path d="M8 1v14M1 8h14" />
+              </svg>
+              {tables.length === 0 && (
+                <p className="text-[13px] font-normal">Add or import</p>
+              )}
+            </span>
+          </div>
+          {isDropdownOpen && (
+            <AddTableDropdown
+              dropdownRef={dropdownRef}
+              buttonRef={buttonRef}
+              isOpen={isDropdownOpen}
+              onClose={() => setIsDropdownOpen(false)}
+              baseId={baseId}
+              onTableCreated={(tableId: string) => {
+                setSelectedTableId(tableId);
+                router.push(`/${baseId}/${tableId}`);
+              }}
+            />
           )}
           <div className="h-full flex-grow rounded-tr-lg bg-teal-500 [background:linear-gradient(rgba(0,0,0,0.1),rgba(0,0,0,0.1)),rgb(20,184,166)]"></div>
         </div>
