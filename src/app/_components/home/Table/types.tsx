@@ -1,5 +1,5 @@
 import { type ColumnDef } from "@tanstack/react-table";
-import { ColumnType } from "@prisma/client";
+import { ColumnType, FilterOperator } from "@prisma/client";
 
 export interface ColumnMeta {
   type: ColumnType;
@@ -26,6 +26,11 @@ export type SortedColumn = {
   order: "asc" | "desc";
 };
 
+export type FilterCondition = {
+  columnId: string;
+  operator: FilterOperator;
+  value: string | null;
+};
 // Cell type
 export interface Cell {
   id: string;

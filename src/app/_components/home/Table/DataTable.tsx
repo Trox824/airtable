@@ -20,8 +20,7 @@ import cuid from "cuid";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { toast } from "react-hot-toast";
 import { type SortCondition } from "../ToolBar/SortModal";
-import { type SimpleColumn } from "./types";
-// Option 1: Create a custom type
+import { type SimpleColumn, type FilterCondition } from "./types";
 
 interface DataTableProps {
   tableId: string;
@@ -30,6 +29,7 @@ interface DataTableProps {
   loadingColumns: boolean;
   sortConditions: SortCondition[];
   sortedColumns: SortedColumn[];
+  filterConditions: FilterCondition[];
 }
 
 export function DataTable({
@@ -39,6 +39,7 @@ export function DataTable({
   loadingColumns,
   sortConditions,
   sortedColumns,
+  filterConditions,
 }: DataTableProps) {
   const [columnSizing, setColumnSizing] = useState({});
   const [rowSelection, setRowSelection] = useState({});
@@ -46,7 +47,7 @@ export function DataTable({
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
-  const totalCountQuery = api.rows.totalCount.useQuery({ tableId });
+  // const totalCountQuery = api.rows.totalCount.useQuery({ tableId });
   const {
     data: rowsData,
     isLoading: loadingRows,
@@ -59,6 +60,7 @@ export function DataTable({
       limit: 100,
       searchQuery,
       sortConditions,
+      filterConditions,
     },
     {
       getNextPageParam: (lastPage) => lastPage.nextCursor,
@@ -506,6 +508,7 @@ export function DataTable({
                       >
                     }
                     sortedColumns={sortedColumns}
+                    filterConditions={filterConditions}
                   />
                 </table>
               </div>

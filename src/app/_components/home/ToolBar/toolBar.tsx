@@ -3,7 +3,7 @@ import { useState, useRef, useEffect } from "react";
 import { SortModal } from "./SortModal";
 import FilterModal from "./FilterModal";
 import { ColumnType } from "@prisma/client";
-import { SimpleColumn, SortedColumn } from "../Table/types";
+import { FilterCondition, SimpleColumn, SortedColumn } from "../Table/types";
 import { type SortCondition } from "./SortModal";
 
 interface ToolbarProps {
@@ -20,6 +20,8 @@ interface ToolbarProps {
   viewId: string;
   sortConditions?: SortCondition[];
   setSortedColumns: (columns: SortedColumn[]) => void;
+  filterConditions: FilterCondition[];
+  setFilterConditions: React.Dispatch<React.SetStateAction<FilterCondition[]>>;
 }
 
 export default function Toolbar({
@@ -36,6 +38,8 @@ export default function Toolbar({
   viewId,
   sortConditions = [],
   setSortedColumns,
+  filterConditions,
+  setFilterConditions,
 }: ToolbarProps) {
   const [isSearchVisible, setIsSearchVisible] = useState(false);
   const [searchValue, setSearchValue] = useState("");
@@ -180,7 +184,11 @@ export default function Toolbar({
         <div className="relative" ref={filterButtonRef}>
           <button
             onClick={() => setOpenFilterModal(true)}
-            className="flex cursor-pointer items-center gap-x-2 rounded-sm p-2 hover:bg-gray-200/60"
+            className={`flex cursor-pointer items-center gap-x-2 rounded-sm p-2 ${
+              filterConditions.length > 0
+                ? "bg-orange-300/40 hover:bg-red-300/60"
+                : "hover:bg-gray-200/60"
+            }`}
           >
             <svg
               xmlns="http://www.w3.org/2000/svg"
@@ -192,17 +200,27 @@ export default function Toolbar({
               strokeWidth="2"
               strokeLinecap="round"
               strokeLinejoin="round"
-              className="lucide lucide-list-filter"
+              className={`lucide lucide-list-filter ${
+                filterConditions.length > 0 ? "text-red-600" : ""
+              }`}
             >
               <path d="M3 6h18"></path>
               <path d="M7 12h10"></path>
               <path d="M10 18h4"></path>
             </svg>
-            <div>Filter</div>
+            <div className={filterConditions.length > 0 ? "text-red-600" : ""}>
+              Filter
+            </div>
           </button>
 
           {openFilterModal && (
-            <FilterModal columns={columns} loading={loadingColumns} />
+            <FilterModal
+              columns={columns}
+              loading={loadingColumns}
+              viewId={viewId}
+              filterConditions={filterConditions}
+              setFilterConditions={setFilterConditions}
+            />
           )}
         </div>
         <button className="flex cursor-pointer items-center gap-x-2 rounded-sm p-2 hover:bg-gray-200/60">

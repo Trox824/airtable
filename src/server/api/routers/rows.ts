@@ -1,34 +1,69 @@
-import { Prisma, ColumnType, type Row } from "@prisma/client";
+import {
+  Prisma,
+  FilterOperator,
+  ColumnType,
+  Row,
+  Cell as PrismaCell,
+} from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { createTRPCRouter, publicProcedure } from "~/server/api/trpc";
 
-// Define more specific types
-type Column = {
-  type: ColumnType;
-};
-
-type Cell = {
-  id: string;
-  columnId: string;
-  valueText: string | null;
-  valueNumber: number | null;
-  column: Column;
-};
-
-type RowWithCells = Omit<Row, "createdAt" | "updatedAt"> & {
-  cells: Cell[];
-  createdAt?: Date;
-  updatedAt?: Date;
-};
+// Define RowWithCells using Prisma's types for better integration
+type RowWithCells = Prisma.RowGetPayload<{
+  include: {
+    cells: {
+      include: {
+        column: { select: { type: true } };
+      };
+    };
+  };
+}>;
 
 type PaginatedResponse = {
   items: RowWithCells[];
-  nextCursor: string | undefined;
+  nextCursor?: string;
   totalCount: number;
 };
 
+// Utility to parse numeric values safely
+const parseNumber = (value?: string) => (value ? parseFloat(value) : undefined);
+
+// Simplified filter condition builder
+const buildFilterCondition = ({
+  operator,
+  value,
+}: {
+  operator: FilterOperator;
+  value?: string | null;
+}): Prisma.CellWhereInput => {
+  switch (operator) {
+    case FilterOperator.Contains:
+      return { valueText: { contains: value ?? "", mode: "insensitive" } };
+    case FilterOperator.Equals:
+      return {
+        OR: [
+          { valueText: value ?? "" },
+          { valueNumber: value ? parseNumber(value) : null },
+        ],
+      };
+    case FilterOperator.GreaterThan:
+      return { valueNumber: { gt: parseNumber(value ?? undefined) } };
+    case FilterOperator.SmallerThan:
+      return { valueNumber: { lt: parseNumber(value ?? undefined) } };
+    case FilterOperator.IsEmpty:
+      return { valueText: "", valueNumber: null };
+    case FilterOperator.IsNotEmpty:
+      return {
+        OR: [{ valueText: { not: "" } }, { valueNumber: { not: null } }],
+      };
+    default:
+      return {};
+  }
+};
+
 export const rowsRouter = createTRPCRouter({
+  // Create a new row
   create: publicProcedure
     .input(
       z.object({
@@ -44,68 +79,44 @@ export const rowsRouter = createTRPCRouter({
       }),
     )
     .mutation(async ({ ctx, input }): Promise<RowWithCells> => {
-      const tableExists = await ctx.db.table.findUnique({
+      const table = await ctx.db.table.findUnique({
         where: { id: input.tableId },
-        include: {
-          columns: true,
-        },
+        include: { columns: true },
       });
 
-      if (!tableExists) {
-        throw new TRPCError({
-          code: "NOT_FOUND",
-          message: "Table not found",
-        });
+      if (!table) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Table not found" });
       }
 
-      if (!tableExists.columns.length) {
+      if (table.columns.length === 0) {
         throw new TRPCError({
           code: "BAD_REQUEST",
           message: "Table has no columns",
         });
       }
 
-      return ctx.db.$transaction(async (tx) => {
-        const row = await tx.row.create({
+      const row = await ctx.db.$transaction(async (tx) => {
+        const createdRow = await tx.row.create({
           data: {
             tableId: input.tableId,
             cells: {
-              create: tableExists.columns.map((column) => ({
+              create: table.columns.map((column) => ({
                 columnId: column.id,
-                valueText: column.type === "Text" ? "" : null,
+                valueText: column.type === ColumnType.Text ? "" : null,
                 valueNumber: null,
               })),
             },
           },
           include: {
-            cells: {
-              include: {
-                column: {
-                  select: {
-                    type: true,
-                  },
-                },
-              },
-            },
+            cells: { include: { column: { select: { type: true } } } },
           },
         });
 
-        // If there are sort conditions, fetch the row with proper ordering
         if (input.sortConditions?.length) {
           const sortedRow = await tx.row.findUnique({
-            where: {
-              id: row.id,
-            },
+            where: { id: createdRow.id },
             include: {
-              cells: {
-                include: {
-                  column: {
-                    select: {
-                      type: true,
-                    },
-                  },
-                },
-              },
+              cells: { include: { column: { select: { type: true } } } },
             },
           });
 
@@ -119,18 +130,20 @@ export const rowsRouter = createTRPCRouter({
           return sortedRow;
         }
 
-        return row;
+        return createdRow;
       });
+
+      return row;
     }),
 
+  // Get total count of rows in a table
   totalCount: publicProcedure
     .input(z.object({ tableId: z.string() }))
-    .query(async ({ ctx, input }): Promise<number> => {
-      return ctx.db.row.count({
-        where: { tableId: input.tableId },
-      });
+    .query(({ ctx, input }): Promise<number> => {
+      return ctx.db.row.count({ where: { tableId: input.tableId } });
     }),
 
+  // Get rows by table ID with pagination, sorting, and filtering
   getByTableId: publicProcedure
     .input(
       z.object({
@@ -146,122 +159,81 @@ export const rowsRouter = createTRPCRouter({
             }),
           )
           .optional(),
+        filterConditions: z
+          .array(
+            z.object({
+              columnId: z.string(),
+              operator: z.nativeEnum(FilterOperator),
+              value: z.string().nullable().optional(),
+            }),
+          )
+          .optional(),
       }),
     )
     .query(async ({ ctx, input }): Promise<PaginatedResponse> => {
-      const { tableId, limit, cursor, searchQuery, sortConditions } = input;
+      const {
+        tableId,
+        limit,
+        cursor,
+        searchQuery,
+        sortConditions,
+        filterConditions,
+      } = input;
+
+      // Build where clause
       const where: Prisma.RowWhereInput = {
         tableId,
-        ...(searchQuery
-          ? {
-              cells: {
-                some: {
-                  OR: [
-                    {
-                      valueText: {
-                        contains: searchQuery,
-                        mode: Prisma.QueryMode.insensitive,
-                      },
-                    },
-                    {
-                      valueNumber: !isNaN(parseFloat(searchQuery))
-                        ? parseFloat(searchQuery)
-                        : undefined,
-                    },
-                  ],
+        ...(cursor && { id: { gt: cursor } }),
+        ...(searchQuery && {
+          cells: {
+            some: {
+              OR: [
+                { valueText: { contains: searchQuery, mode: "insensitive" } },
+                {
+                  valueNumber: !isNaN(parseNumber(searchQuery)!)
+                    ? { equals: parseNumber(searchQuery) }
+                    : undefined,
                 },
-              },
-            }
-          : {}),
-        ...(cursor
-          ? {
-              id: {
-                gt: cursor,
-              },
-            }
-          : {}),
+              ],
+            },
+          },
+        }),
+        ...(filterConditions?.length && {
+          AND: filterConditions.map(({ columnId, ...filter }) => ({
+            cells: { some: { columnId, ...buildFilterCondition(filter) } },
+          })),
+        }),
       };
 
-      const totalCount = await ctx.db.row.count({
-        where,
-      });
-
-      // Build the orderBy clause based on sort conditions
+      // Build orderBy clause
       const orderBy: Prisma.RowOrderByWithRelationInput[] =
-        sortConditions && sortConditions.length > 0
-          ? [
-              {
-                cells: {
-                  _count: sortConditions[0]?.order,
-                },
-              },
-              { id: "asc" as const }, // secondary sort to ensure consistent ordering
-            ]
-          : [{ id: "asc" as const }];
+        sortConditions?.map(({ columnId, order }) => ({
+          cells: { _count: order },
+        })) ?? [];
+      orderBy.push({ id: "asc" });
 
-      const items = await ctx.db.row.findMany({
+      // Fetch total count
+      const totalCount = await ctx.db.row.count({ where });
+
+      // Fetch rows with pagination
+      const rows = await ctx.db.row.findMany({
         where,
         take: limit + 1,
         orderBy,
         include: {
-          cells: {
-            include: {
-              column: {
-                select: {
-                  type: true,
-                },
-              },
-            },
-          },
+          cells: { include: { column: { select: { type: true } } } },
         },
       });
 
-      // Sort the items after fetching them
-      const sortedItems =
-        sortConditions && sortConditions.length > 0
-          ? items.sort((a, b) => {
-              const aCell = a.cells.find(
-                (cell) => cell.columnId === sortConditions[0]?.columnId,
-              );
-              const bCell = b.cells.find(
-                (cell) => cell.columnId === sortConditions[0]?.columnId,
-              );
-
-              const aValue =
-                aCell?.valueText ?? aCell?.valueNumber?.toString() ?? "";
-              const bValue =
-                bCell?.valueText ?? bCell?.valueNumber?.toString() ?? "";
-
-              return sortConditions[0]?.order === "asc"
-                ? aValue.localeCompare(bValue)
-                : bValue.localeCompare(aValue);
-            })
-          : items;
-
+      // Determine next cursor
       let nextCursor: string | undefined;
-      if (sortedItems.length > limit) {
-        const nextItem = sortedItems.pop()!;
+      if (rows.length > limit) {
+        const nextItem = rows.pop()!;
         nextCursor = nextItem.id;
       }
 
-      const transformedItems: RowWithCells[] = sortedItems.map((item) => ({
-        id: item.id,
-        tableId: item.tableId,
-        cells: item.cells.map((cell) => ({
-          id: cell.id,
-          columnId: cell.columnId,
-          valueText: cell.valueText,
-          valueNumber: cell.valueNumber,
-          column: {
-            type: cell.column.type,
-          },
-        })),
-        createdAt: item.createdAt,
-        updatedAt: item.updatedAt,
-      }));
-
       return {
-        items: transformedItems,
+        items: rows as RowWithCells[],
         nextCursor,
         totalCount,
       };

@@ -78,4 +78,55 @@ export const viewRouter = createTRPCRouter({
           sort.direction === "Ascending" ? ("asc" as const) : ("desc" as const),
       }));
     }),
+  saveFilterConditions: publicProcedure
+    .input(
+      z.object({
+        viewId: z.string(),
+        filters: z.array(
+          z.object({
+            columnId: z.string(),
+            operator: z.enum([
+              "GreaterThan",
+              "SmallerThan",
+              "IsEmpty",
+              "IsNotEmpty",
+              "Equals",
+              "Contains",
+            ]),
+            value: z.string().optional(),
+          }),
+        ),
+      }),
+    )
+    .mutation(async ({ input }) => {
+      // Delete existing filters for this view
+      await prisma.filter.deleteMany({
+        where: { viewId: input.viewId },
+      });
+
+      // Create new filters
+      await prisma.filter.createMany({
+        data: input.filters.map((filter) => ({
+          viewId: input.viewId,
+          columnId: filter.columnId,
+          operator: filter.operator,
+          value: filter.value,
+        })),
+      });
+
+      return { success: true };
+    }),
+  getFilterConditions: publicProcedure
+    .input(z.object({ viewId: z.string() }))
+    .query(async ({ input }) => {
+      const filters = await prisma.filter.findMany({
+        where: { viewId: input.viewId },
+      });
+
+      return filters.map((filter) => ({
+        columnId: filter.columnId,
+        operator: filter.operator,
+        value: filter.value,
+      }));
+    }),
 });

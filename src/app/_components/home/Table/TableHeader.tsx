@@ -58,9 +58,7 @@ export function TableHeader({
             return (
               <th
                 key={header.id}
-                className={`relative box-border flex h-8 cursor-pointer border-b border-r-[0.8px] border-r-gray-300 ${
-                  isSorted ? "bg-blue-200" : "bg-[#f1f6ff]"
-                } p-0 leading-6 ${
+                className={`relative box-border flex h-8 cursor-pointer border-b border-r-[0.8px] border-r-gray-300 bg-[#f1f6ff] p-0 leading-6 ${
                   header.column.getIsResizing() ? "select-none" : ""
                 }`}
                 style={{

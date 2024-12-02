@@ -38,7 +38,9 @@ export function SortModal({
   const [activeColumnSelection, setActiveColumnSelection] = useState<
     number | null
   >(null);
-  const [isSecondarySelectOpen, setIsSecondarySelectOpen] = useState(false);
+  const [openDropdownIndex, setOpenDropdownIndex] = useState<number | null>(
+    null,
+  );
 
   const utils = api.useUtils();
   const updateSort = api.view.updateSort.useMutation({
@@ -186,19 +188,20 @@ export function SortModal({
                 <button
                   className="flex w-full items-center justify-between gap-x-2 rounded-sm border p-2 hover:bg-gray-100"
                   onClick={() =>
-                    setIsSecondarySelectOpen(!isSecondarySelectOpen)
+                    setOpenDropdownIndex(
+                      openDropdownIndex === index ? null : index,
+                    )
                   }
                 >
                   <div>Number Column</div>
                   <LucideChevronDown size={16} />
                 </button>
-                {isSecondarySelectOpen && (
+                {openDropdownIndex === index && (
                   <div className="absolute left-0 top-full z-50 mt-1 min-w-80 rounded-sm border bg-white p-4 shadow-lg">
                     <ColumnSelector
                       onSelect={(column) => {
                         // Handle the selection
-
-                        setIsSecondarySelectOpen(false);
+                        setOpenDropdownIndex(null);
                       }}
                     />
                   </div>

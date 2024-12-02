@@ -6,7 +6,7 @@ import {
   type Table,
   type Cell,
 } from "@tanstack/react-table";
-import { SortedColumn, type Row } from "./types";
+import { FilterCondition, SortedColumn, type Row } from "./types";
 import { CellRenderer } from "./CellRender";
 import { useVirtualizer } from "@tanstack/react-virtual";
 
@@ -18,6 +18,7 @@ interface TableBodyProps {
   searchQuery: string;
   virtualizer: ReturnType<typeof useVirtualizer>;
   sortedColumns: SortedColumn[];
+  filterConditions: FilterCondition[];
 }
 
 const MemoizedCellRenderer = memo(CellRenderer);
@@ -30,6 +31,7 @@ export const TableBody = memo(function TableBody({
   searchQuery,
   virtualizer,
   sortedColumns,
+  filterConditions,
 }: TableBodyProps) {
   const renderCell = useCallback(
     (cell: Cell<Row, unknown>, value: unknown) => {
@@ -38,6 +40,8 @@ export const TableBody = memo(function TableBody({
         table,
         cell: cell,
       } as CellContext<Row, string | number | null>;
+
+      console.log(`Data type of cell value: ${typeof value}`);
 
       if (cell.column.id === "select") {
         return (
@@ -86,6 +90,15 @@ export const TableBody = memo(function TableBody({
     [sortedColumns],
   );
 
+  const isColumnFiltered = useCallback(
+    (columnId: string) => {
+      return filterConditions.some(
+        (filterCond) => filterCond.columnId === columnId,
+      );
+    },
+    [filterConditions],
+  );
+
   return (
     <tbody>
       {paddingTop > 0 && (
@@ -113,14 +126,17 @@ export const TableBody = memo(function TableBody({
             {row.getVisibleCells().map((cell) => {
               const value = cell.getValue();
               const isSorted = isColumnSorted(cell.column.id);
+              const isFiltered = isColumnFiltered(cell.column.id);
 
               return (
                 <td
                   key={cell.id}
                   className={`flex overflow-scroll whitespace-nowrap border-b-[0.8px] border-r-[0.8px] text-[13px] font-normal [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden ${
-                    isSorted
-                      ? "bg-blue-200 hover:bg-blue-300"
-                      : "bg-white hover:bg-gray-100"
+                    isFiltered
+                      ? "bg-orange-300/40 hover:bg-orange-300/60"
+                      : isSorted
+                        ? "bg-blue-200 hover:bg-blue-300"
+                        : "bg-white hover:bg-gray-100"
                   }`}
                   style={{
                     width: cell.column.getSize(),
