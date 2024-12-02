@@ -5,6 +5,17 @@ import { createTRPCRouter, publicProcedure } from "~/server/api/trpc";
 import { PrismaClient } from "@prisma/client";
 import { faker } from "@faker-js/faker";
 import { v4 as uuidv4 } from "uuid";
+
+// Add this interface at the top of the file
+interface TableCreateInput {
+  baseId: string;
+  name: string;
+  view?: {
+    id: string;
+    name: string;
+  };
+}
+
 const validateTable = async (db: PrismaClient, tableId: string) => {
   console.log("Validating table:", tableId);
   const table = await db.table.findUnique({
@@ -19,12 +30,19 @@ const validateTable = async (db: PrismaClient, tableId: string) => {
   console.log("Table validated successfully:", table);
   return table;
 };
+
 export const tablesRouter = createTRPCRouter({
   create: publicProcedure
     .input(
       z.object({
         baseId: z.string(),
         name: z.string().min(1),
+        view: z
+          .object({
+            id: z.string(),
+            name: z.string(),
+          })
+          .optional(),
       }),
     )
     .mutation(async ({ ctx, input }) => {
@@ -37,12 +55,26 @@ export const tablesRouter = createTRPCRouter({
           message: "Base ID not found",
         });
       }
+
       return ctx.db.$transaction(async (tx) => {
-        // Create table
+        // Create table with nested view creation
         const table = await tx.table.create({
           data: {
             baseId: input.baseId,
             name: input.name,
+            views: {
+              create: {
+                name: "Grid view",
+              },
+            },
+          },
+          include: {
+            views: {
+              select: {
+                id: true,
+                name: true,
+              },
+            },
           },
         });
 
@@ -91,7 +123,10 @@ export const tablesRouter = createTRPCRouter({
           ),
         });
 
-        return table;
+        return {
+          ...table,
+          view: table.views[0], // Return the first view as the default
+        };
       });
     }),
   delete: publicProcedure
@@ -122,6 +157,15 @@ export const tablesRouter = createTRPCRouter({
           id: true,
           name: true,
           baseId: true,
+          views: {
+            select: {
+              id: true,
+              name: true,
+            },
+            orderBy: {
+              createdAt: "asc",
+            },
+          },
           _count: {
             select: {
               columns: true,
@@ -132,9 +176,43 @@ export const tablesRouter = createTRPCRouter({
       });
     }),
   getById: publicProcedure
-    .input(z.object({ id: z.string() }))
+    .input(
+      z.object({
+        id: z.string(),
+        viewId: z.string().optional(),
+      }),
+    )
     .query(async ({ ctx, input }) => {
-      const table = await validateTable(ctx.db, input.id);
+      const table = await ctx.db.table.findUnique({
+        where: { id: input.id },
+        include: {
+          views: {
+            select: {
+              id: true,
+              name: true,
+            },
+            orderBy: {
+              createdAt: "asc",
+            },
+          },
+        },
+      });
+
+      if (!table) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Table not found",
+        });
+      }
+
+      // If viewId is provided, verify it belongs to this table
+      if (input.viewId && !table.views.some((v) => v.id === input.viewId)) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "View not found for this table",
+        });
+      }
+
       return table;
     }),
   needsInitialization: publicProcedure
@@ -171,6 +249,14 @@ export const tablesRouter = createTRPCRouter({
       }
       return ctx.db.$transaction(
         async (tx) => {
+          // Create default view
+          const view = await tx.view.create({
+            data: {
+              tableId: input.tableId,
+              name: "Grid view",
+            },
+          });
+
           // Create 2 default columns in a single query
           await tx.column.createMany({
             data: [
@@ -227,10 +313,11 @@ export const tablesRouter = createTRPCRouter({
                 },
               },
             }),
+            view: view,
           };
         },
         {
-          timeout: 300000, // Increase timeout to 10 seconds
+          timeout: 300000,
         },
       );
     }),
@@ -254,11 +341,24 @@ export const tablesRouter = createTRPCRouter({
 
       return ctx.db.$transaction(
         async (tx) => {
-          // Create table
+          // Create table with nested view creation
           const table = await tx.table.create({
             data: {
               baseId: input.baseId,
               name: input.name,
+              views: {
+                create: {
+                  name: "Grid view",
+                },
+              },
+            },
+            include: {
+              views: {
+                select: {
+                  id: true,
+                  name: true,
+                },
+              },
             },
           });
 
@@ -324,7 +424,7 @@ export const tablesRouter = createTRPCRouter({
           return table;
         },
         {
-          timeout: 300000, // 5 minutes timeout
+          timeout: 300000,
         },
       );
     }),

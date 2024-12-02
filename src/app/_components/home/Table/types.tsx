@@ -6,6 +6,11 @@ export interface ColumnMeta {
   name: string;
 }
 
+export type SimpleColumn = {
+  name: string;
+  id: string;
+  type: ColumnType;
+};
 // Column type
 export interface TableColumn {
   type: ColumnType;

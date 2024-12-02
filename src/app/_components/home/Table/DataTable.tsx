@@ -15,17 +15,34 @@ import {
   TableOptions,
 } from "@tanstack/react-table";
 import { Row, type ColumnMeta } from "./types";
-import { ColumnType } from "@prisma/client";
+import { Column, ColumnType } from "@prisma/client";
 import cuid from "cuid";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { toast } from "react-hot-toast";
+import { type SortCondition } from "../ToolBar/SortModal";
+
+// Option 1: Create a custom type
+type SimpleColumn = {
+  name: string;
+  id: string;
+  type: ColumnType;
+};
 
 interface DataTableProps {
   tableId: string;
   searchQuery: string;
+  columns: SimpleColumn[] | undefined;
+  loadingColumns: boolean;
+  sortConditions: SortCondition[];
 }
 
-export function DataTable({ tableId, searchQuery }: DataTableProps) {
+export function DataTable({
+  tableId,
+  searchQuery,
+  columns,
+  loadingColumns,
+  sortConditions,
+}: DataTableProps) {
   const [columnSizing, setColumnSizing] = useState({});
   const [rowSelection, setRowSelection] = useState({});
   const [isEditing, setIsEditing] = useState(false);
@@ -33,9 +50,6 @@ export function DataTable({ tableId, searchQuery }: DataTableProps) {
   const dropdownRef = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
   const totalCountQuery = api.rows.totalCount.useQuery({ tableId });
-  // API queries
-  const { data: columns, isLoading: loadingColumns } =
-    api.columns.getByTableId.useQuery({ tableId });
   const {
     data: rowsData,
     isLoading: loadingRows,
@@ -47,6 +61,7 @@ export function DataTable({ tableId, searchQuery }: DataTableProps) {
       tableId,
       limit: 100,
       searchQuery,
+      sortConditions,
     },
     {
       getNextPageParam: (lastPage) => lastPage.nextCursor,
@@ -104,23 +119,23 @@ export function DataTable({ tableId, searchQuery }: DataTableProps) {
         tableId,
         limit: 100,
         searchQuery,
+        sortConditions,
       });
+
       const previousData = utils.rows.getByTableId.getInfiniteData({
         tableId,
         limit: 100,
         searchQuery,
+        sortConditions,
       });
 
       const id = cuid();
       const emptyCells = (columns ?? []).map((column) => ({
         id: cuid(),
-        valueText: null,
+        valueText: column.type === "Text" ? "" : null,
         valueNumber: null,
         column: {
           type: column.type,
-          name: column.name,
-          id: column.id,
-          tableId: tableId,
         },
         columnId: column.id,
         rowId: id,
@@ -130,23 +145,35 @@ export function DataTable({ tableId, searchQuery }: DataTableProps) {
         id,
         tableId,
         cells: emptyCells,
+        createdAt: new Date(),
+        updatedAt: new Date(),
       } as Row;
 
       utils.rows.getByTableId.setInfiniteData(
-        { tableId, limit: 100, searchQuery },
+        { tableId, limit: 100, searchQuery, sortConditions },
         (oldData) => {
-          if (!oldData) return oldData;
+          if (!oldData) return { pages: [], pageParams: [] };
 
-          const newPages = [...(oldData.pages ?? [])];
-          newPages[0] = {
-            ...oldData.pages[0],
-            items: [...(oldData.pages[0]?.items ?? []), optimisticRow],
-            totalCount: (oldData.pages[0]?.totalCount ?? 0) + 1,
-            nextCursor: oldData.pages[0]?.nextCursor,
-          };
+          const newPages = [...oldData.pages];
+          if (newPages[0]) {
+            if (sortConditions.length === 0) {
+              newPages[0] = {
+                ...newPages[0],
+                items: [...newPages[0].items, optimisticRow],
+                totalCount: (newPages[0].totalCount ?? 0) + 1,
+              };
+            } else {
+              newPages[0] = {
+                ...newPages[0],
+                items: [optimisticRow, ...newPages[0].items],
+                totalCount: (newPages[0].totalCount ?? 0) + 1,
+              };
+            }
+          }
+
           return {
+            ...oldData,
             pages: newPages,
-            pageParams: oldData.pageParams,
           };
         },
       );
@@ -157,20 +184,27 @@ export function DataTable({ tableId, searchQuery }: DataTableProps) {
     onError: (err, newRow, context) => {
       if (context?.previousData) {
         utils.rows.getByTableId.setInfiniteData(
-          { tableId, limit: 100, searchQuery },
+          { tableId, limit: 100, searchQuery, sortConditions },
           context.previousData,
         );
       }
+      toast.error("Failed to add row");
     },
+
     onSettled: async () => {
-      await utils.rows.getByTableId.invalidate({ tableId });
+      await utils.rows.getByTableId.invalidate({
+        tableId,
+        limit: 100,
+        searchQuery,
+        sortConditions,
+      });
     },
   });
 
-  const rows = useMemo(
-    () => rowsData?.pages.flatMap((page) => page.items) ?? [],
-    [rowsData],
-  );
+  const rows = useMemo(() => {
+    const result = rowsData?.pages.flatMap((page) => page.items) ?? [];
+    return result;
+  }, [rowsData]);
   const columnMap = useMemo(() => {
     const map = new Map<string, ColumnMeta>();
     columns?.forEach((col) =>
@@ -233,17 +267,19 @@ export function DataTable({ tableId, searchQuery }: DataTableProps) {
         tableId,
         limit: 100,
         searchQuery,
+        sortConditions,
       });
 
       const previousData = utils.rows.getByTableId.getInfiniteData({
         tableId,
         limit: 100,
         searchQuery,
+        sortConditions,
       });
 
       // Optimistically update the cell
       utils.rows.getByTableId.setInfiniteData(
-        { tableId, limit: 100, searchQuery },
+        { tableId, limit: 100, searchQuery, sortConditions },
         (oldData) => {
           if (!oldData) return oldData;
 
@@ -275,7 +311,7 @@ export function DataTable({ tableId, searchQuery }: DataTableProps) {
       // Rollback on error
       if (context?.previousData) {
         utils.rows.getByTableId.setInfiniteData(
-          { tableId, limit: 100, searchQuery },
+          { tableId, limit: 100, searchQuery, sortConditions },
           context.previousData,
         );
       }
@@ -288,6 +324,7 @@ export function DataTable({ tableId, searchQuery }: DataTableProps) {
         tableId,
         limit: 100,
         searchQuery,
+        sortConditions,
       });
     },
   });
@@ -331,8 +368,11 @@ export function DataTable({ tableId, searchQuery }: DataTableProps) {
   );
 
   const handleAddRow = useCallback(() => {
-    addRow.mutate({ tableId });
-  }, [addRow, tableId]);
+    addRow.mutate({
+      tableId,
+      sortConditions,
+    });
+  }, [addRow, tableId, sortConditions]);
 
   // Add the handler function near other handlers
   const handleRenameColumn = useCallback(
@@ -380,7 +420,6 @@ export function DataTable({ tableId, searchQuery }: DataTableProps) {
             });
             return;
           }
-          // Find the cell by its ID
           const cell = row.cells.find((c) => c.columnId === columnId);
           if (!cell) {
             console.error("Cell not found:", columnId);
@@ -405,22 +444,17 @@ export function DataTable({ tableId, searchQuery }: DataTableProps) {
 
   // Modify the virtualization configuration
   const rowVirtualizer = useVirtualizer({
-    count: searchQuery
-      ? (rowsData?.pages[0]?.totalCount ?? 0)
-      : (totalCountQuery.data ?? 0),
+    count: rows.length,
     getScrollElement: () => tableContainerRef.current,
     estimateSize: useCallback(() => 32, []),
     overscan: 20,
     onChange: (instance) => {
-      // Use getVirtualItems() to get the current visible range
       const virtualItems = instance.getVirtualItems();
       const lastItem = virtualItems[virtualItems.length - 1];
-
       if (!lastItem) return;
 
       const totalLoadedItems = rows.length;
 
-      // Start loading next page when user scrolls past 70% of loaded items
       if (
         lastItem.index >= Math.floor(totalLoadedItems * 0.7) &&
         hasNextPage &&
@@ -432,7 +466,7 @@ export function DataTable({ tableId, searchQuery }: DataTableProps) {
   });
   return (
     <>
-      <div className="fixed bottom-[40px] left-0 right-0 top-[calc(theme(spacing.navbar)+2rem+theme(spacing.toolbar))] flex flex-col bg-[#f8f8f8]">
+      <div className="flex h-[calc(100vh-theme(spacing.navbar)-5rem-theme(spacing.toolbar))] flex-1 flex-col bg-[#f8f8f8]">
         {isLoading ? (
           <TableLoading />
         ) : (

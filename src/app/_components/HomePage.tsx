@@ -7,20 +7,17 @@ import { Base } from "@prisma/client";
 import { signOut } from "next-auth/react";
 import { v4 as uuidv4 } from "uuid"; // Use this for generating UUIDs
 
-interface TableType {
-  id: string;
-  name: string;
-  createdAt: Date;
-  updatedAt: Date;
-}
-
 interface BaseType {
   id: string;
-  userId: string;
   name: string;
-  createdAt: Date;
-  updatedAt: Date;
-  tables?: { id: string }[];
+  tables?: {
+    id: string;
+    name: string;
+    views: {
+      id: string;
+      name: string;
+    }[];
+  }[];
 }
 
 const HomePage: React.FC = () => {
@@ -33,17 +30,10 @@ const HomePage: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
 
   const { isLoading: apiLoading, error, data } = api.base.getAll.useQuery();
+  console.log(data);
   useEffect(() => {
     if (data) {
-      const mappedData: BaseType[] = data.map((item: BaseType) => ({
-        name: item.name,
-        id: item.id,
-        userId: item.userId,
-        createdAt: item.createdAt,
-        updatedAt: item.updatedAt,
-        tables: item.tables,
-      }));
-      setLocalBases(mappedData);
+      setLocalBases(data);
       setIsLoading(false);
     }
   }, [data]);
@@ -52,7 +42,9 @@ const HomePage: React.FC = () => {
     onSuccess: (createdBase) => {
       if (!createdBase) return;
       void queryClient.invalidateQueries({ queryKey: ["base.getAll"] });
-      router.push(`/${createdBase.id}/${createdBase.firstTableId}`);
+      router.push(
+        `/${createdBase.id}/${createdBase.firstTableId}/${createdBase.firstViewId}`,
+      );
     },
   });
 
@@ -447,7 +439,9 @@ const HomePage: React.FC = () => {
               <>
                 {localBases?.map((base) => (
                   <div key={base.id} className="group relative">
-                    <Link href={`/${base.id}/${base.tables?.[0]?.id}`}>
+                    <Link
+                      href={`/${base.id}/${base.tables?.[0]?.id}/${base.tables?.[0]?.views?.[0]?.id}`}
+                    >
                       <div
                         className={`shadow-at-main-nav hover:shadow-at-main-nav-hover mt-1 h-24 rounded-md border bg-white p-4 ${isOptimisticBase === base.id ? "opacity-70" : ""}`}
                       >

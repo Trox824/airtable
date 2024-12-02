@@ -34,10 +34,12 @@ export function AddTableDropdown({
       const previousTables = utils.tables.getByBaseId.getData({ baseId });
 
       const tempTableId = uuidv4();
+      const tempViewId = uuidv4();
       const tempTable = {
         id: tempTableId,
         name: newTable.name,
         baseId: newTable.baseId,
+        views: [{ id: tempViewId, name: "Grid view" }],
         _count: {
           columns: 0,
           rows: 0,
@@ -51,12 +53,12 @@ export function AddTableDropdown({
 
       onTableCreated(tempTableId);
 
-      return { previousTables, tempTableId };
+      return { previousTables, tempTableId, tempViewId };
     },
     onSuccess: (result) => {
       onClose();
       if (result.id) {
-        router.push(`/${baseId}/${result.id}`);
+        router.push(`/${baseId}/${result.id}/${result.views[0]?.id}`);
       }
     },
     onError: (error, _, context) => {
@@ -73,10 +75,12 @@ export function AddTableDropdown({
       const previousTables = utils.tables.getByBaseId.getData({ baseId });
 
       const tempTableId = uuidv4();
+      const tempViewId = uuidv4();
       const tempTable = {
         id: tempTableId,
         name: newTable.name,
         baseId: newTable.baseId,
+        views: [{ id: tempViewId, name: "Grid view" }],
         _count: {
           columns: 0,
           rows: 0,
@@ -90,13 +94,18 @@ export function AddTableDropdown({
 
       onTableCreated(tempTableId);
 
-      return { previousTables, tempTableId };
+      router.push(`/${baseId}/${tempTableId}/${tempViewId}`);
+
+      return { previousTables, tempTableId, tempViewId };
     },
 
     onSuccess: (createdTable) => {
       onTableCreated(createdTable.id);
       setTableName("");
       onClose();
+      router.replace(
+        `/${baseId}/${createdTable.id}/${createdTable.views[0]?.id}`,
+      );
     },
 
     onError: (_, __, context) => {

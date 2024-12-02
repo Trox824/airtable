@@ -7,18 +7,19 @@ interface LayoutProps {
   params: Promise<{
     baseId: string;
     tableId: string;
+    viewId: string;
   }>;
 }
 
 export default async function Layout({ children, params }: LayoutProps) {
-  const { baseId, tableId } = await params;
+  const { baseId, tableId, viewId } = await params;
 
   return (
     <>
       <Suspense fallback={<NavbarSkeleton />}>
         <Navbar BaseId={baseId} />
       </Suspense>
-      <TableTabs tableId={tableId} baseId={baseId} />
+      <TableTabs tableId={tableId} baseId={baseId} viewId={viewId} />
       {children}
     </>
   );

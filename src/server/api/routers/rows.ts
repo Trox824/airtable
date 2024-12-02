@@ -16,14 +16,12 @@ type Cell = {
   column: Column;
 };
 
-// Modify the RowWithCells type to make createdAt and updatedAt optional
 type RowWithCells = Omit<Row, "createdAt" | "updatedAt"> & {
   cells: Cell[];
   createdAt?: Date;
   updatedAt?: Date;
 };
 
-// Define the response type for pagination
 type PaginatedResponse = {
   items: RowWithCells[];
   nextCursor: string | undefined;
@@ -32,13 +30,24 @@ type PaginatedResponse = {
 
 export const rowsRouter = createTRPCRouter({
   create: publicProcedure
-    .input(z.object({ tableId: z.string() }))
+    .input(
+      z.object({
+        tableId: z.string(),
+        sortConditions: z
+          .array(
+            z.object({
+              columnId: z.string(),
+              order: z.enum(["asc", "desc"]),
+            }),
+          )
+          .optional(),
+      }),
+    )
     .mutation(async ({ ctx, input }): Promise<RowWithCells> => {
-      // First verify the table exists
       const tableExists = await ctx.db.table.findUnique({
         where: { id: input.tableId },
         include: {
-          columns: true, // Include columns to verify we have columns to create cells for
+          columns: true,
         },
       });
 
@@ -57,7 +66,6 @@ export const rowsRouter = createTRPCRouter({
       }
 
       return ctx.db.$transaction(async (tx) => {
-        // Create the row with cells
         const row = await tx.row.create({
           data: {
             tableId: input.tableId,
@@ -72,34 +80,49 @@ export const rowsRouter = createTRPCRouter({
           include: {
             cells: {
               include: {
-                column: true,
+                column: {
+                  select: {
+                    type: true,
+                  },
+                },
               },
             },
           },
         });
 
-        // Verify cells were created by fetching the row again
-        const verifiedRow = await tx.row.findUnique({
-          where: { id: row.id },
-          include: {
-            cells: {
-              include: {
-                column: true,
+        // If there are sort conditions, fetch the row with proper ordering
+        if (input.sortConditions?.length) {
+          const sortedRow = await tx.row.findUnique({
+            where: {
+              id: row.id,
+            },
+            include: {
+              cells: {
+                include: {
+                  column: {
+                    select: {
+                      type: true,
+                    },
+                  },
+                },
               },
             },
-          },
-        });
-
-        if (!verifiedRow?.cells.length) {
-          throw new TRPCError({
-            code: "INTERNAL_SERVER_ERROR",
-            message: "Failed to create cells",
           });
+
+          if (!sortedRow) {
+            throw new TRPCError({
+              code: "INTERNAL_SERVER_ERROR",
+              message: "Failed to create row",
+            });
+          }
+
+          return sortedRow;
         }
 
-        return verifiedRow;
+        return row;
       });
     }),
+
   totalCount: publicProcedure
     .input(z.object({ tableId: z.string() }))
     .query(async ({ ctx, input }): Promise<number> => {
@@ -107,6 +130,7 @@ export const rowsRouter = createTRPCRouter({
         where: { tableId: input.tableId },
       });
     }),
+
   getByTableId: publicProcedure
     .input(
       z.object({
@@ -114,11 +138,18 @@ export const rowsRouter = createTRPCRouter({
         limit: z.number().min(1).max(1000).default(100),
         cursor: z.string().optional(),
         searchQuery: z.string().optional(),
+        sortConditions: z
+          .array(
+            z.object({
+              columnId: z.string(),
+              order: z.enum(["asc", "desc"]),
+            }),
+          )
+          .optional(),
       }),
     )
     .query(async ({ ctx, input }): Promise<PaginatedResponse> => {
-      const { tableId, limit, cursor, searchQuery } = input;
-
+      const { tableId, limit, cursor, searchQuery, sortConditions } = input;
       const where: Prisma.RowWhereInput = {
         tableId,
         ...(searchQuery
@@ -155,18 +186,29 @@ export const rowsRouter = createTRPCRouter({
         where,
       });
 
+      // Build the orderBy clause based on sort conditions
+      const orderBy: Prisma.RowOrderByWithRelationInput[] =
+        sortConditions && sortConditions.length > 0
+          ? [
+              {
+                cells: {
+                  _count: sortConditions[0]?.order,
+                },
+              },
+              { id: "asc" as const }, // secondary sort to ensure consistent ordering
+            ]
+          : [{ id: "asc" as const }];
+
       const items = await ctx.db.row.findMany({
         where,
         take: limit + 1,
-        orderBy: {
-          id: "asc",
-        },
+        orderBy,
         include: {
           cells: {
             include: {
               column: {
                 select: {
-                  type: true, // Only select what we need for the Column type
+                  type: true,
                 },
               },
             },
@@ -174,14 +216,35 @@ export const rowsRouter = createTRPCRouter({
         },
       });
 
+      // Sort the items after fetching them
+      const sortedItems =
+        sortConditions && sortConditions.length > 0
+          ? items.sort((a, b) => {
+              const aCell = a.cells.find(
+                (cell) => cell.columnId === sortConditions[0]?.columnId,
+              );
+              const bCell = b.cells.find(
+                (cell) => cell.columnId === sortConditions[0]?.columnId,
+              );
+
+              const aValue =
+                aCell?.valueText ?? aCell?.valueNumber?.toString() ?? "";
+              const bValue =
+                bCell?.valueText ?? bCell?.valueNumber?.toString() ?? "";
+
+              return sortConditions[0]?.order === "asc"
+                ? aValue.localeCompare(bValue)
+                : bValue.localeCompare(aValue);
+            })
+          : items;
+
       let nextCursor: string | undefined;
-      if (items.length > limit) {
-        const nextItem = items.pop()!;
+      if (sortedItems.length > limit) {
+        const nextItem = sortedItems.pop()!;
         nextCursor = nextItem.id;
       }
 
-      // Transform the items to match RowWithCells type
-      const transformedItems: RowWithCells[] = items.map((item) => ({
+      const transformedItems: RowWithCells[] = sortedItems.map((item) => ({
         id: item.id,
         tableId: item.tableId,
         cells: item.cells.map((cell) => ({

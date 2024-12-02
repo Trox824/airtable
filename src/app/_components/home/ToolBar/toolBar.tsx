@@ -1,13 +1,68 @@
 "use client";
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
+import { SortModal } from "./SortModal";
+import FilterModal from "./FilterModal";
+import { ColumnType } from "@prisma/client";
+import { SimpleColumn } from "../Table/types";
+import { type SortCondition } from "./SortModal";
 
 interface ToolbarProps {
   handleSearch: (query: string) => void;
+  openViewBar: boolean;
+  setOpenViewBar: (open: boolean) => void;
+  openSortModal: boolean;
+  setOpenSortModal: (open: boolean) => void;
+  openFilterModal: boolean;
+  setOpenFilterModal: (open: boolean) => void;
+  columns: SimpleColumn[] | undefined;
+  loadingColumns: boolean;
+  onSort: (conditions: SortCondition[]) => void;
+  viewId: string;
+  sortConditions?: SortCondition[];
 }
 
-export default function Toolbar({ handleSearch }: ToolbarProps) {
+export default function Toolbar({
+  handleSearch,
+  openViewBar,
+  setOpenViewBar,
+  openSortModal,
+  setOpenSortModal,
+  openFilterModal,
+  setOpenFilterModal,
+  columns,
+  loadingColumns,
+  onSort,
+  viewId,
+  sortConditions = [],
+}: ToolbarProps) {
   const [isSearchVisible, setIsSearchVisible] = useState(false);
   const [searchValue, setSearchValue] = useState("");
+  const sortButtonRef = useRef<HTMLDivElement>(null);
+  const filterButtonRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (
+        sortButtonRef.current &&
+        !sortButtonRef.current.contains(event.target as Node) &&
+        openSortModal
+      ) {
+        setOpenSortModal(false);
+      }
+      if (
+        filterButtonRef.current &&
+        !filterButtonRef.current.contains(event.target as Node) &&
+        openFilterModal
+      ) {
+        setOpenFilterModal(false);
+      }
+    }
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [openSortModal, setOpenSortModal, openFilterModal, setOpenFilterModal]);
 
   const toggleSearch = () => {
     setIsSearchVisible(!isSearchVisible);
@@ -23,10 +78,19 @@ export default function Toolbar({ handleSearch }: ToolbarProps) {
     handleSearch(value);
   };
 
+  const toggleViewBar = () => {
+    setOpenViewBar(!openViewBar);
+  };
+
   return (
     <div className="fixed left-0 right-0 top-[calc(theme(spacing.navbar)+2rem)] z-30 flex h-toolbar w-full items-center justify-between border-b border-gray-300 bg-white px-1 py-[5px] text-xs text-gray-700">
       <div className="flex items-center gap-x-3">
-        <button className="flex cursor-pointer items-center gap-x-2 rounded-sm border border-gray-200/10 p-2 hover:bg-gray-200/60">
+        <button
+          onClick={toggleViewBar}
+          className={`flex cursor-pointer items-center gap-x-2 rounded-sm border border-gray-200/10 p-2 hover:bg-gray-200/60 ${
+            openViewBar ? "bg-gray-200" : ""
+          }`}
+        >
           <svg
             xmlns="http://www.w3.org/2000/svg"
             width="16"
@@ -111,25 +175,34 @@ export default function Toolbar({ handleSearch }: ToolbarProps) {
           </svg>
           <div>List</div>
         </button>
-        <button className="flex cursor-pointer items-center gap-x-2 rounded-sm p-2 hover:bg-gray-200/60">
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            width="16"
-            height="16"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            className="lucide lucide-list-filter"
+        <div className="relative" ref={filterButtonRef}>
+          <button
+            onClick={() => setOpenFilterModal(true)}
+            className="flex cursor-pointer items-center gap-x-2 rounded-sm p-2 hover:bg-gray-200/60"
           >
-            <path d="M3 6h18"></path>
-            <path d="M7 12h10"></path>
-            <path d="M10 18h4"></path>
-          </svg>
-          <div>Filter</div>
-        </button>
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className="lucide lucide-list-filter"
+            >
+              <path d="M3 6h18"></path>
+              <path d="M7 12h10"></path>
+              <path d="M10 18h4"></path>
+            </svg>
+            <div>Filter</div>
+          </button>
+
+          {openFilterModal && (
+            <FilterModal columns={columns} loading={loadingColumns} />
+          )}
+        </div>
         <button className="flex cursor-pointer items-center gap-x-2 rounded-sm p-2 hover:bg-gray-200/60">
           <svg
             xmlns="http://www.w3.org/2000/svg"
@@ -152,26 +225,49 @@ export default function Toolbar({ handleSearch }: ToolbarProps) {
           </svg>
           <div>Group</div>
         </button>
-        <button className="flex cursor-pointer items-center gap-x-2 rounded-sm p-2 hover:bg-gray-200/60">
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            width="16"
-            height="16"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            className="lucide lucide-arrow-up-down"
+        <div className="relative" ref={sortButtonRef}>
+          <button
+            onClick={() => setOpenSortModal(true)}
+            className={`flex cursor-pointer items-center gap-x-2 rounded-sm p-2 ${
+              sortConditions.length > 0
+                ? "bg-blue-300/40 hover:bg-blue-300/60"
+                : "hover:bg-gray-200/60"
+            }`}
           >
-            <path d="m21 16-4 4-4-4"></path>
-            <path d="M17 20V4"></path>
-            <path d="m3 8 4-4 4 4"></path>
-            <path d="M7 4v16"></path>
-          </svg>
-          <div>Sort</div>
-        </button>
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className={`lucide lucide-arrow-up-down ${
+                sortConditions.length > 0 ? "text-blue-600" : ""
+              }`}
+            >
+              <path d="m21 16-4 4-4-4"></path>
+              <path d="M17 20V4"></path>
+              <path d="m3 8 4-4 4 4"></path>
+              <path d="M7 4v16"></path>
+            </svg>
+            <div className={sortConditions.length > 0 ? "text-blue-600" : ""}>
+              Sort
+            </div>
+          </button>
+
+          {openSortModal && (
+            <SortModal
+              columns={columns}
+              loading={loadingColumns}
+              onSort={onSort}
+              viewId={viewId}
+              initialSortConditions={sortConditions}
+            />
+          )}
+        </div>
         <button className="flex cursor-pointer items-center gap-x-2 rounded-sm p-2 hover:bg-gray-200/60">
           <svg
             xmlns="http://www.w3.org/2000/svg"

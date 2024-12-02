@@ -65,23 +65,27 @@ export const TableBody = memo(function TableBody({
   );
 
   const virtualRows = virtualizer.getVirtualItems();
-  const paddingTop = virtualRows.length > 0 ? (virtualRows[0]?.start ?? 0) : 0;
+  const paddingTop = virtualRows.length > 0 ? virtualRows[0]?.start : 0;
   const paddingBottom =
     virtualRows.length > 0
       ? virtualizer.getTotalSize() -
         (virtualRows[virtualRows.length - 1]?.end ?? 0)
       : 0;
 
+  const allRows = table.getRowModel().rows;
+
   return (
     <tbody>
-      {paddingTop > 0 && (
+      {paddingTop && paddingTop > 0 && (
         <tr>
           <td colSpan={columns.length} style={{ height: `${paddingTop}px` }} />
         </tr>
       )}
 
       {virtualRows.map((virtualRow) => {
-        const row = table.getRowModel().rows[virtualRow.index];
+        if (virtualRow.index >= allRows.length) return null;
+
+        const row = allRows[virtualRow.index];
         if (!row) return null;
 
         return (
@@ -96,7 +100,7 @@ export const TableBody = memo(function TableBody({
               transform: `translateY(${virtualRow.start}px)`,
             }}
           >
-            {row.getVisibleCells().map((cell, cellIndex) => {
+            {row.getVisibleCells().map((cell) => {
               const value = cell.getValue();
               const displayValue = value?.toString() ?? "";
               const isMatch =

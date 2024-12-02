@@ -10,17 +10,22 @@ import { AddTableDropdown } from "./Table/AddTableDropdown";
 interface TableTabsProps {
   baseId: string;
   tableId: string;
+  viewId: string;
 }
 interface TableWithCount {
   id: string;
   name: string;
   baseId: string;
+  views: {
+    id: string;
+    name: string;
+  }[];
   _count: {
     columns: number;
     rows: number;
   };
 }
-export function TableTabs({ baseId, tableId }: TableTabsProps) {
+export function TableTabs({ baseId, tableId, viewId }: TableTabsProps) {
   const router = useRouter();
   const { data: tables = [] } = api.tables.getByBaseId.useQuery<
     TableWithCount[]
@@ -30,6 +35,7 @@ export function TableTabs({ baseId, tableId }: TableTabsProps) {
   const [newTableName, setNewTableName] = useState("");
   const [selectedTableId, setSelectedTableId] = useState<string>(tableId);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const [selectedViewId, setSelectedViewId] = useState<string>(viewId);
 
   const dropdownRef = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
@@ -61,38 +67,40 @@ export function TableTabs({ baseId, tableId }: TableTabsProps) {
       await utils.tables.getByBaseId.cancel({ baseId });
       const previousTables = utils.tables.getByBaseId.getData({ baseId });
       const tempTableId = uuidv4();
+      const tempViewId = uuidv4();
+
       const tempTable: TableWithCount = {
         id: tempTableId,
         name: newTable.name,
         baseId: newTable.baseId,
+        views: [{ id: tempViewId, name: "Grid view" }],
         _count: {
           columns: 0,
           rows: 0,
         },
       };
+
       utils.tables.getByBaseId.setData(
         { baseId },
         (old: TableWithCount[] = []) => [...old, tempTable],
       );
 
       setSelectedTableId(tempTable.id);
+      setSelectedViewId(tempViewId);
       setIsCreating(false);
 
-      // Navigate immediately with the temp ID
-      router.push(`/${baseId}/${tempTableId}`);
-      return { previousTables, tempTableId };
+      // Navigate with view ID
+      router.push(`/${baseId}/${tempTableId}/${tempViewId}`);
+      return { previousTables, tempTableId, tempViewId };
     },
     onSuccess: (createdTable, _, context) => {
-      // Update the cache with the real table ID
       utils.tables.getByBaseId.setData(
         { baseId },
         (old: TableWithCount[] | undefined) =>
           old?.map((table) =>
             table.id === context?.tempTableId
               ? {
-                  id: createdTable.id,
-                  name: createdTable.name,
-                  baseId: createdTable.baseId,
+                  ...createdTable,
                   _count: {
                     columns: 0,
                     rows: 0,
@@ -101,7 +109,10 @@ export function TableTabs({ baseId, tableId }: TableTabsProps) {
               : table,
           ),
       );
-      router.replace(`/${baseId}/${createdTable.id}`);
+      // Navigate to the real view ID
+      router.replace(
+        `/${baseId}/${createdTable.id}/${createdTable.views[0]?.id}`,
+      );
     },
     onError: (error, _, context) => {
       if (context?.previousTables) {
@@ -124,9 +135,15 @@ export function TableTabs({ baseId, tableId }: TableTabsProps) {
     }
   };
 
-  const handleTableClick = (tableId: string) => {
-    setSelectedTableId(tableId);
-    router.push(`/${baseId}/${tableId}`);
+  const handleTableClick = (table: TableWithCount) => {
+    setSelectedTableId(table.id);
+    const targetViewId =
+      table.id === tableId && viewId ? viewId : table.views[0]?.id;
+
+    if (targetViewId) {
+      setSelectedViewId(targetViewId);
+      router.push(`/${baseId}/${table.id}/${targetViewId}`);
+    }
   };
 
   useEffect(() => {
@@ -157,7 +174,7 @@ export function TableTabs({ baseId, tableId }: TableTabsProps) {
           {tables.map((table, index) => (
             <div
               key={table.id}
-              onClick={() => handleTableClick(table.id)}
+              onClick={() => handleTableClick(table)}
               className={`-ml-[1px] h-full cursor-pointer bg-teal-500 [background:linear-gradient(rgba(0,0,0,0.1),rgba(0,0,0,0.1)),rgb(20,184,166)] ${
                 tables[index] && tables[index + 1]?.id === selectedTableId
                   ? "rounded-br-sm"

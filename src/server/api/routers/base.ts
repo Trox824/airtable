@@ -37,6 +37,14 @@ export const baseRouter = createTRPCRouter({
             },
           });
 
+          // Create default view
+          const view = await tx.view.create({
+            data: {
+              tableId: table.id,
+              name: "Grid view",
+            },
+          });
+
           // Create two columns
           const columns = await tx.column.createMany({
             data: [
@@ -84,7 +92,18 @@ export const baseRouter = createTRPCRouter({
             id: base.id,
             name: base.name,
             firstTableId: table.id,
-            tables: [table.name],
+            firstViewId: view.id,
+            tables: [
+              {
+                name: table.name,
+                views: [
+                  {
+                    id: view.id,
+                    name: view.name,
+                  },
+                ],
+              },
+            ],
           };
         },
         {
@@ -99,9 +118,13 @@ export const baseRouter = createTRPCRouter({
       where: { userId: session.user.id },
       include: {
         tables: {
-          select: {
-            id: true,
-            name: true,
+          include: {
+            views: {
+              select: {
+                id: true,
+                name: true,
+              },
+            },
           },
         },
       },

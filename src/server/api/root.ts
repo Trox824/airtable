@@ -4,7 +4,7 @@ import { tablesRouter } from "./routers/tables";
 import { columnsRouter } from "./routers/columns";
 import { rowsRouter } from "./routers/rows";
 import { cellsRouter } from "./routers/cells";
-
+import { viewRouter } from "./routers/view";
 /**
  * This is the primary router for your server.
  *
@@ -16,6 +16,7 @@ export const appRouter = createTRPCRouter({
   columns: columnsRouter,
   rows: rowsRouter,
   cells: cellsRouter,
+  view: viewRouter,
 });
 
 // export type definition of API
