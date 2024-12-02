@@ -31,6 +31,14 @@ const validateTable = async (db: PrismaClient, tableId: string) => {
   return table;
 };
 
+// Helper function to create COALESCE-based ordering
+const createOrderByWithNulls = (field: string, direction: "asc" | "desc") => {
+  return [
+    // First sort by whether the field is null (nulls last)
+    { [field]: { sort: direction, nulls: "last" } },
+  ];
+};
+
 export const tablesRouter = createTRPCRouter({
   create: publicProcedure
     .input(
@@ -180,12 +188,29 @@ export const tablesRouter = createTRPCRouter({
       z.object({
         id: z.string(),
         viewId: z.string().optional(),
+        sortField: z.string().optional(),
+        sortDirection: z.enum(["asc", "desc"]).optional(),
       }),
     )
     .query(async ({ ctx, input }) => {
       const table = await ctx.db.table.findUnique({
         where: { id: input.id },
         include: {
+          rows: {
+            include: {
+              cells: {
+                include: {
+                  column: true,
+                },
+              },
+            },
+            orderBy: input.sortField
+              ? createOrderByWithNulls(
+                  `cells.${input.sortField}`,
+                  input.sortDirection ?? "asc",
+                )
+              : { createdAt: "asc" },
+          },
           views: {
             select: {
               id: true,

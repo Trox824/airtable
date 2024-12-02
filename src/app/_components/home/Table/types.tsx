@@ -21,6 +21,10 @@ export interface TableColumn {
   tableId: string;
   columnDef: ColumnDef<Row, string | number | null>;
 }
+export type SortedColumn = {
+  column: SimpleColumn;
+  order: "asc" | "desc";
+};
 
 // Cell type
 export interface Cell {

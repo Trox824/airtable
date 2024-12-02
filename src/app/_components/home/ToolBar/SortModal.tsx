@@ -5,7 +5,7 @@ import {
   LucideSearch,
 } from "lucide-react";
 import { useState } from "react";
-import { SimpleColumn } from "../Table/types";
+import { SimpleColumn, SortedColumn } from "../Table/types";
 import { api } from "~/trpc/react";
 
 export type SortCondition = {
@@ -19,6 +19,7 @@ interface SortModalProps {
   onSort: (conditions: SortCondition[]) => void;
   viewId: string;
   initialSortConditions: SortCondition[];
+  setSortedColumns: (columns: SortedColumn[]) => void;
 }
 
 export function SortModal({
@@ -27,6 +28,7 @@ export function SortModal({
   onSort,
   viewId,
   initialSortConditions,
+  setSortedColumns,
 }: SortModalProps) {
   const [isSelectingColumn, setIsSelectingColumn] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -67,6 +69,19 @@ export function SortModal({
     const newConditions = sortConditions.filter((_, i) => i !== index);
     setSortConditions(newConditions);
     onSort(newConditions);
+
+    // Update sorted columns to remove the deleted condition
+    const newSortedColumns =
+      columns
+        ?.filter((col) =>
+          newConditions.some((condition) => condition.columnId === col.id),
+        )
+        .map((col) => ({
+          column: col,
+          order:
+            newConditions.find((c) => c.columnId === col.id)?.order ?? "asc",
+        })) ?? [];
+    setSortedColumns(newSortedColumns);
 
     // Save to database
     void updateSort.mutate({

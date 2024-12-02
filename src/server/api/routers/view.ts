@@ -69,12 +69,13 @@ export const viewRouter = createTRPCRouter({
     .query(async ({ input }) => {
       const sorts = await prisma.sort.findMany({
         where: { viewId: input.viewId },
-        orderBy: { order: "asc" }, // Ensure the order is maintained
+        orderBy: { order: "asc" },
       });
 
       return sorts.map((sort) => ({
         columnId: sort.columnId,
-        order: sort.direction === "Ascending" ? "asc" : "desc",
+        order:
+          sort.direction === "Ascending" ? ("asc" as const) : ("desc" as const),
       }));
     }),
 });

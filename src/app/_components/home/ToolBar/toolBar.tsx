@@ -3,7 +3,7 @@ import { useState, useRef, useEffect } from "react";
 import { SortModal } from "./SortModal";
 import FilterModal from "./FilterModal";
 import { ColumnType } from "@prisma/client";
-import { SimpleColumn } from "../Table/types";
+import { SimpleColumn, SortedColumn } from "../Table/types";
 import { type SortCondition } from "./SortModal";
 
 interface ToolbarProps {
@@ -19,6 +19,7 @@ interface ToolbarProps {
   onSort: (conditions: SortCondition[]) => void;
   viewId: string;
   sortConditions?: SortCondition[];
+  setSortedColumns: (columns: SortedColumn[]) => void;
 }
 
 export default function Toolbar({
@@ -34,6 +35,7 @@ export default function Toolbar({
   onSort,
   viewId,
   sortConditions = [],
+  setSortedColumns,
 }: ToolbarProps) {
   const [isSearchVisible, setIsSearchVisible] = useState(false);
   const [searchValue, setSearchValue] = useState("");
@@ -262,9 +264,33 @@ export default function Toolbar({
             <SortModal
               columns={columns}
               loading={loadingColumns}
-              onSort={onSort}
+              onSort={(conditions) => {
+                onSort(conditions);
+                const firstCondition = conditions[0];
+                if (
+                  conditions.length === 1 &&
+                  sortConditions.length === 0 &&
+                  columns &&
+                  firstCondition?.columnId &&
+                  firstCondition?.order
+                ) {
+                  const sortedColumn = columns.find(
+                    (col) => col.id === firstCondition.columnId,
+                  );
+                  if (sortedColumn) {
+                    setSortedColumns([
+                      {
+                        column: sortedColumn,
+                        order: firstCondition.order,
+                        ...sortedColumn,
+                      },
+                    ]);
+                  }
+                }
+              }}
               viewId={viewId}
               initialSortConditions={sortConditions}
+              setSortedColumns={setSortedColumns}
             />
           )}
         </div>

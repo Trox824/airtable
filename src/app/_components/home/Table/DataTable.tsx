@@ -14,19 +14,14 @@ import {
   ColumnDef,
   TableOptions,
 } from "@tanstack/react-table";
-import { Row, type ColumnMeta } from "./types";
+import { Row, SortedColumn, type ColumnMeta } from "./types";
 import { Column, ColumnType } from "@prisma/client";
 import cuid from "cuid";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { toast } from "react-hot-toast";
 import { type SortCondition } from "../ToolBar/SortModal";
-
+import { type SimpleColumn } from "./types";
 // Option 1: Create a custom type
-type SimpleColumn = {
-  name: string;
-  id: string;
-  type: ColumnType;
-};
 
 interface DataTableProps {
   tableId: string;
@@ -34,6 +29,7 @@ interface DataTableProps {
   columns: SimpleColumn[] | undefined;
   loadingColumns: boolean;
   sortConditions: SortCondition[];
+  sortedColumns: SortedColumn[];
 }
 
 export function DataTable({
@@ -42,6 +38,7 @@ export function DataTable({
   columns,
   loadingColumns,
   sortConditions,
+  sortedColumns,
 }: DataTableProps) {
   const [columnSizing, setColumnSizing] = useState({});
   const [rowSelection, setRowSelection] = useState({});
@@ -485,6 +482,7 @@ export function DataTable({
                     onCreateColumn={handleCreateColumn}
                     onRenameColumn={handleRenameColumn}
                     setIsDropdownOpen={setIsDropdownOpen}
+                    sortedColumns={sortedColumns}
                   />
                 </table>
               </div>
@@ -507,6 +505,7 @@ export function DataTable({
                         typeof useVirtualizer
                       >
                     }
+                    sortedColumns={sortedColumns}
                   />
                 </table>
               </div>

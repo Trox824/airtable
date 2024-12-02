@@ -6,6 +6,12 @@ import { DataTable } from "~/app/_components/home/Table/DataTable";
 import { useParams } from "next/navigation";
 import { api } from "~/trpc/react";
 import { type SortCondition } from "~/app/_components/home/ToolBar/SortModal";
+import { type SimpleColumn } from "~/app/_components/home/Table/types";
+
+type SortedColumn = {
+  column: SimpleColumn;
+  order: "asc" | "desc";
+};
 
 export default function TablePage() {
   const { tableId, baseId, viewId } = useParams();
@@ -14,6 +20,7 @@ export default function TablePage() {
   const [openSortModal, setOpenSortModal] = useState(false);
   const [openFilterModal, setOpenFilterModal] = useState(false);
   const [sortConditions, setSortConditions] = useState<SortCondition[]>([]);
+  const [sortedColumns, setSortedColumns] = useState<SortedColumn[]>([]);
 
   const { data: columns, isLoading: loadingColumns } =
     api.columns.getByTableId.useQuery({ tableId: tableId as string });
@@ -24,15 +31,18 @@ export default function TablePage() {
     });
 
   useEffect(() => {
-    if (initialSortConditions) {
-      setSortConditions(
-        initialSortConditions.map((condition) => ({
-          columnId: condition.columnId,
-          order: condition.order as "asc" | "desc",
-        })),
+    if (initialSortConditions && columns) {
+      setSortedColumns(
+        initialSortConditions
+          .map((condition) => ({
+            column: columns.find((col) => col.id === condition.columnId)!,
+            order: condition.order,
+          }))
+          .filter((sort) => sort.column !== undefined),
       );
+      setSortConditions(initialSortConditions);
     }
-  }, [initialSortConditions]);
+  }, [initialSortConditions, columns]);
 
   const handleSort = useCallback((conditions: SortCondition[]) => {
     setSortConditions(conditions);
@@ -53,6 +63,7 @@ export default function TablePage() {
         onSort={handleSort}
         viewId={viewId as string}
         sortConditions={sortConditions}
+        setSortedColumns={setSortedColumns}
       />
       <div className="mt-[calc(theme(spacing.navbar)+2rem+theme(spacing.toolbar))] flex">
         {/* Sidebar */}
@@ -76,6 +87,7 @@ export default function TablePage() {
             columns={columns}
             loadingColumns={loadingColumns}
             sortConditions={sortConditions}
+            sortedColumns={sortedColumns}
           />
         </div>
       </div>
