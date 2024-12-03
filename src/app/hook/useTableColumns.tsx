@@ -8,7 +8,7 @@ import {
   type Row,
   type ColumnMeta,
   type SimpleColumn,
-} from "/Users/Lyra/airtable/src/app/Types/types";
+} from "~/app/Types/types";
 import { CellRenderer } from "~/app/_components/home/Table/CellRender";
 
 export function useTableColumns(
