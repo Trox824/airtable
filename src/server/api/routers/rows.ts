@@ -313,19 +313,23 @@ export const rowsRouter = createTRPCRouter({
             'updatedAt', c."updatedAt"
           ) 
           ORDER BY c."columnId"
-        ) FILTER (WHERE c.id IS NOT NULL), '[]') AS cells,
+        ) FILTER (WHERE c.id IS NOT NULL), '[]') AS cells
         ${
-          sortConditions
-            ?.map(
-              (_, index) => `
-            MAX(CASE 
-              WHEN s${index}."valueNumber" IS NOT NULL 
-              THEN CAST(s${index}."valueNumber" AS TEXT)
-              ELSE COALESCE(s${index}."valueText", '')
-            END) as sort_value_${index}
-          `,
-            )
-            .join(", ") ?? "NULL as sort_value_0"
+          sortConditions?.length
+            ? `,
+            ${sortConditions
+              .map(
+                (_, index) => `
+              MAX(CASE 
+                WHEN s${index}."valueNumber" IS NOT NULL 
+                THEN CAST(s${index}."valueNumber" AS TEXT)
+                ELSE COALESCE(s${index}."valueText", '')
+              END) as sort_value_${index}
+            `,
+              )
+              .join(", ")}
+        `
+            : ""
         }
       FROM "Row" r
       LEFT JOIN "Cell" c ON c."rowId" = r.id
@@ -333,12 +337,15 @@ export const rowsRouter = createTRPCRouter({
       ${joinClauses.join(" ")}
       ${whereClause}
       GROUP BY r.id, r."tableId", r."createdAt", r."updatedAt"
-      ORDER BY ${
-        sortConditions
-          ?.map(
-            (sort, index) => `sort_value_${index} ${sort.order.toUpperCase()}`,
-          )
-          .join(", ") ?? "r.id ASC"
+      ${
+        sortConditions?.length
+          ? `ORDER BY ${sortConditions
+              .map(
+                (sort, index) =>
+                  `sort_value_${index} ${sort.order.toUpperCase()}`,
+              )
+              .join(", ")}`
+          : "ORDER BY r.id ASC"
       }
       LIMIT $${paramIndex}::integer
     `;
