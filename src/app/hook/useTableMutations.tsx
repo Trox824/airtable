@@ -24,6 +24,7 @@ export function useTableMutations(
   sortConditions: SortCondition[],
   filterConditions: FilterCondition[],
   columns: SimpleColumn[],
+  setIsTableCreating: (isCreating: boolean) => void,
 ) {
   const utils = api.useUtils();
   const mappedSortConditions = mapSortConditionsToAPI(sortConditions);
@@ -34,6 +35,7 @@ export function useTableMutations(
       name: string;
       type: ColumnType;
     }) => {
+      setIsTableCreating(true);
       await utils.columns.getByTableId.cancel({ tableId });
       const previousColumns = utils.columns.getByTableId.getData({ tableId });
       const id = cuid();
@@ -54,6 +56,7 @@ export function useTableMutations(
       return { previousColumns };
     },
     onError: (err, newColumn, context) => {
+      setIsTableCreating(false);
       if (context?.previousColumns) {
         utils.columns.getByTableId.setData(
           { tableId },
@@ -62,6 +65,7 @@ export function useTableMutations(
       }
     },
     onSettled: async () => {
+      setIsTableCreating(false);
       await utils.columns.getByTableId.invalidate({ tableId });
       await utils.rows.getByTableId.invalidate({ tableId });
     },
@@ -69,6 +73,7 @@ export function useTableMutations(
 
   const addRow = api.rows.create.useMutation({
     onMutate: async () => {
+      setIsTableCreating(true);
       await utils.rows.getByTableId.cancel({
         tableId,
         limit: 100,
@@ -144,6 +149,7 @@ export function useTableMutations(
       return { previousData };
     },
     onError: (err, newRow, context) => {
+      setIsTableCreating(false);
       if (context?.previousData) {
         utils.rows.getByTableId.setInfiniteData(
           {
@@ -159,6 +165,7 @@ export function useTableMutations(
       toast.error("Failed to add row");
     },
     onSettled: async () => {
+      setIsTableCreating(false);
       await utils.rows.getByTableId.invalidate({
         tableId,
         limit: 100,

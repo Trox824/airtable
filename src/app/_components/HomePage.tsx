@@ -28,8 +28,14 @@ const HomePage: React.FC = () => {
   const queryClient = useQueryClient();
   const [isOptimisticBase, setIsOptimisticBase] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [creatingBases, setCreatingBases] = useState<string[]>([]);
 
-  const { isLoading: apiLoading, error, data } = api.base.getAll.useQuery();
+  const {
+    isLoading: apiLoading,
+    error,
+    data,
+    refetch,
+  } = api.base.getAll.useQuery();
   console.log(data);
   useEffect(() => {
     if (data) {
@@ -38,32 +44,108 @@ const HomePage: React.FC = () => {
     }
   }, [data]);
 
+  useEffect(() => {
+    const refetchTimer = setTimeout(() => {
+      void refetch();
+    }, 1000); // Refetch after 1 second
+
+    return () => clearTimeout(refetchTimer);
+  }, [localBases, refetch]);
+
   const createBase = api.base.create.useMutation({
+    onMutate: async (newBase) => {
+      // Cancel any outgoing refetches
+      await queryClient.cancelQueries({ queryKey: ["base.getAll"] });
+
+      // Snapshot the previous value
+      const previousBases = queryClient.getQueryData(["base.getAll"]);
+
+      // Create an optimistic base
+      const optimisticBase = {
+        id: "temp-" + uuidv4(), // temporary ID
+        name: newBase.name,
+        tables: [],
+      };
+
+      // Optimistically update the cache
+      queryClient.setQueryData(
+        ["base.getAll"],
+        (old: BaseType[] | undefined) => {
+          if (!old) return [optimisticBase];
+          return [...old, optimisticBase];
+        },
+      );
+
+      // Return context with the snapshotted value
+      return { previousBases };
+    },
     onSuccess: (createdBase) => {
       if (!createdBase) return;
-      void queryClient.invalidateQueries({ queryKey: ["base.getAll"] });
+
+      // Update the cache with the actual created base
+      queryClient.setQueryData(
+        ["base.getAll"],
+        (old: BaseType[] | undefined) => {
+          if (!old) return [createdBase];
+          // Remove any optimistic base and add the real one
+          return [
+            ...old.filter((base) => !base.id.startsWith("temp-")),
+            createdBase,
+          ];
+        },
+      );
+
+      // Navigate to the new base
       router.push(
         `/${createdBase.id}/${createdBase.firstTableId}/${createdBase.firstViewId}`,
       );
+    },
+    onError: (error, variables, context) => {
+      // On error, roll back to the previous state
+      if (context?.previousBases) {
+        queryClient.setQueryData(["base.getAll"], context.previousBases);
+      }
+      console.error("Error creating base:", error);
+    },
+    onSettled: () => {
+      // Always refetch after error or success to ensure consistency
+      void queryClient.invalidateQueries({ queryKey: ["base.getAll"] });
     },
   });
 
   const deleteBase = api.base.delete.useMutation({
     onMutate: async (deletedBase) => {
-      // Optimistically remove the base from the UI
+      // Cancel any outgoing refetches
+      await queryClient.cancelQueries({ queryKey: ["base.getAll"] });
+
+      // Snapshot the previous value
+      const previousBases = queryClient.getQueryData(["base.getAll"]);
+
+      // Optimistically remove the base from the cache
+      queryClient.setQueryData(
+        ["base.getAll"],
+        (old: BaseType[] | undefined) =>
+          old?.filter((base) => base.id !== deletedBase.id) ?? [],
+      );
+
+      // Optimistically update UI
       setLocalBases((prev) =>
         prev.filter((base) => base.id !== deletedBase.id),
       );
+
+      // Return a context object with the snapshotted value
+      return { previousBases };
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["base.getAll"] });
     },
-    onError: (error) => {
-      // On error, refetch to restore the correct state
-      void queryClient.invalidateQueries({ queryKey: ["base.getAll"] });
-      // Optionally show an error message to the user
+    onError: (error, _, context) => {
+      // Restore from snapshot on error
+      if (context?.previousBases) {
+        queryClient.setQueryData(["base.getAll"], context.previousBases);
+        setLocalBases(context.previousBases as BaseType[]);
+      }
       console.error("Error deleting base:", error);
-      // You could add a toast notification here
     },
   });
 
@@ -73,10 +155,26 @@ const HomePage: React.FC = () => {
     }
   }, [error]);
 
+  const LoadingSkeletonCard = () => (
+    <div className="mt-1 h-24 rounded-md border bg-white p-4">
+      <div className="flex h-full w-full animate-pulse items-center">
+        <div className="mr-4 flex h-14 w-14 items-center justify-center rounded-lg bg-gray-200"></div>
+        <div className="flex flex-col space-y-2">
+          <div className="h-3.5 w-32 rounded bg-gray-200"></div>
+          <div className="h-3 w-16 rounded bg-gray-200"></div>
+        </div>
+      </div>
+    </div>
+  );
+
   const handleCreateBase = async (baseName: string) => {
-    setIsCreating(true);
-    await createBase.mutateAsync({ name: baseName });
-    setIsCreating(false);
+    const tempId = uuidv4();
+    setCreatingBases((prev) => [...prev, tempId]);
+    try {
+      await createBase.mutateAsync({ name: baseName });
+    } finally {
+      setCreatingBases((prev) => prev.filter((id) => id !== tempId));
+    }
   };
 
   const handleLogout = async () => {
@@ -497,6 +595,12 @@ const HomePage: React.FC = () => {
                     )}
                   </div>
                 ))}
+
+                {/* Show skeleton for each creating base */}
+                {creatingBases.map((id) => (
+                  <LoadingSkeletonCard key={id} />
+                ))}
+
                 {/* Create New Base Button/Form */}
                 {!isLoading && (
                   <div className="mt-1 h-24">

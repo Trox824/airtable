@@ -13,6 +13,7 @@ interface TableTabsProps {
   baseId: string;
   tableId: string;
   viewId: string;
+  setIsTableCreating: (isCreating: boolean) => void;
 }
 
 interface TableWithCount {
@@ -29,7 +30,12 @@ interface TableWithCount {
   };
 }
 
-export function TableTabs({ baseId, tableId, viewId }: TableTabsProps) {
+export function TableTabs({
+  baseId,
+  tableId,
+  viewId,
+  setIsTableCreating,
+}: TableTabsProps) {
   const router = useRouter();
   const { data: tables = [], isLoading } = api.tables.getByBaseId.useQuery<
     TableWithCount[]
@@ -65,78 +71,8 @@ export function TableTabs({ baseId, tableId, viewId }: TableTabsProps) {
     };
   }, [dropdownRef, buttonRef]);
 
-  // Mutation to create a table with optimistic update
-  const createTable = api.tables.create.useMutation({
-    onMutate: async (newTable) => {
-      await utils.tables.getByBaseId.cancel({ baseId });
-      const previousTables = utils.tables.getByBaseId.getData({ baseId });
-      const tempTableId = uuidv4();
-      const tempViewId = uuidv4();
-
-      const tempTable: TableWithCount = {
-        id: tempTableId,
-        name: newTable.name,
-        baseId: newTable.baseId,
-        views: [{ id: tempViewId, name: "Grid view" }],
-        _count: {
-          columns: 0,
-          rows: 0,
-        },
-      };
-
-      utils.tables.getByBaseId.setData(
-        { baseId },
-        (old: TableWithCount[] = []) => [...old, tempTable],
-      );
-
-      setSelectedTableId(tempTable.id);
-      setSelectedViewId(tempViewId);
-      setIsCreating(false);
-
-      // Navigate with view ID
-      router.push(`/${baseId}/${tempTableId}/${tempViewId}`);
-      return { previousTables, tempTableId, tempViewId };
-    },
-    onSuccess: (createdTable, _, context) => {
-      utils.tables.getByBaseId.setData(
-        { baseId },
-        (old: TableWithCount[] | undefined) =>
-          old?.map((table) =>
-            table.id === context?.tempTableId
-              ? {
-                  ...createdTable,
-                  _count: {
-                    columns: 0,
-                    rows: 0,
-                  },
-                }
-              : table,
-          ),
-      );
-      // Navigate to the real view ID
-      router.replace(
-        `/${baseId}/${createdTable.id}/${createdTable.views[0]?.id}`,
-      );
-    },
-    onError: (error, _, context) => {
-      if (context?.previousTables) {
-        utils.tables.getByBaseId.setData({ baseId }, context.previousTables);
-      }
-      console.error("Error creating table:", error);
-    },
-  });
-
   const handleCreateTable = () => {
     setIsDropdownOpen(true);
-  };
-
-  const handleSubmitNewTable = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (newTableName.trim()) {
-      createTable.mutate({ baseId, name: newTableName.trim() });
-      setNewTableName("");
-      setIsCreating(false);
-    }
   };
 
   const handleTableClick = (table: TableWithCount) => {
@@ -257,9 +193,8 @@ export function TableTabs({ baseId, tableId, viewId }: TableTabsProps) {
               >
                 <path d="M8 1v14M1 8h14" />
               </svg>
-              {tables.length === 0 && (
-                <p className="text-[13px] font-normal">Add or import</p>
-              )}
+
+              <p className="text-[13px] font-normal">Add or import</p>
             </span>
           </div>
           {isDropdownOpen && (
@@ -273,6 +208,7 @@ export function TableTabs({ baseId, tableId, viewId }: TableTabsProps) {
                 setSelectedTableId(tableId);
                 router.push(`/${baseId}/${tableId}`);
               }}
+              setIsTableCreating={setIsCreating}
             />
           )}
           <div className="h-full flex-grow rounded-tr-lg bg-teal-500 [background:linear-gradient(rgba(0,0,0,0.1),rgba(0,0,0,0.1)),rgb(20,184,166)]"></div>

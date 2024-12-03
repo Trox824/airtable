@@ -33,6 +33,8 @@ interface DataTableProps {
   sortConditions: SortCondition[];
   sortedColumns: SortedColumn[];
   filterConditions: FilterCondition[];
+  isTableCreating: boolean;
+  setIsTableCreating: (isCreating: boolean) => void;
 }
 
 export const DataTable = memo(
@@ -44,6 +46,8 @@ export const DataTable = memo(
     sortConditions,
     sortedColumns,
     filterConditions,
+    isTableCreating,
+    setIsTableCreating,
   }: DataTableProps) => {
     // State
     const [columnSizing, setColumnSizing] = useState<Record<string, number>>(
@@ -76,6 +80,7 @@ export const DataTable = memo(
       sortConditions,
       filterConditions,
       columns ?? [],
+      setIsTableCreating,
     );
 
     // Memoize handlers
@@ -142,8 +147,14 @@ export const DataTable = memo(
     return (
       <>
         <div className="flex h-[calc(100vh-theme(spacing.navbar)-4.5rem-theme(spacing.toolbar))] flex-1 flex-col bg-[#f8f8f8]">
-          {loadingRows ? (
-            <TableLoadingState />
+          {loadingRows || isTableCreating || rows.length === 0 ? (
+            <TableLoadingState
+              loadingMessage={
+                isTableCreating || rows.length === 0
+                  ? "Loading table..."
+                  : "Loading table..."
+              }
+            />
           ) : (
             <div className="flex h-full w-full flex-col">
               <div className="flex h-full flex-col">
@@ -189,7 +200,7 @@ export const DataTable = memo(
           )}
         </div>
         <div className="fixed bottom-0 h-[40px] w-full border-t border-gray-300 bg-white p-2 text-xs text-gray-500">
-          {rows?.length} records
+          {!isTableCreating && rows?.length} records
         </div>
       </>
     );

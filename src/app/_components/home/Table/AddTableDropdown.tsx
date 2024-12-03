@@ -11,6 +11,7 @@ interface AddTableDropdownProps {
   onClose: () => void;
   baseId: string;
   onTableCreated: (tableId: string) => void;
+  setIsTableCreating: (isTableCreating: boolean) => void;
 }
 export function AddTableDropdown({
   dropdownRef,
@@ -19,6 +20,7 @@ export function AddTableDropdown({
   onClose,
   baseId,
   onTableCreated,
+  setIsTableCreating,
 }: AddTableDropdownProps) {
   const router = useRouter();
   const [dropdownPosition, setDropdownPosition] = useState<{
@@ -30,9 +32,9 @@ export function AddTableDropdown({
 
   const createWithFakeData = api.tables.createWithDefaults.useMutation({
     onMutate: async (newTable) => {
+      setIsTableCreating(true);
       await utils.tables.getByBaseId.cancel({ baseId });
       const previousTables = utils.tables.getByBaseId.getData({ baseId });
-
       const tempTableId = uuidv4();
       const tempViewId = uuidv4();
       const tempTable = {
@@ -58,12 +60,14 @@ export function AddTableDropdown({
       return { previousTables, tempTableId, tempViewId };
     },
     onSuccess: (result) => {
+      setIsTableCreating(false);
       onClose();
       if (result.id && result.views?.[0]?.id) {
         router.replace(`/${baseId}/${result.id}/${result.views[0].id}`);
       }
     },
     onError: (error, _, context) => {
+      setIsTableCreating(false);
       if (context?.previousTables) {
         utils.tables.getByBaseId.setData({ baseId }, context.previousTables);
       }
@@ -73,6 +77,7 @@ export function AddTableDropdown({
 
   const createTableMutation = api.tables.create.useMutation({
     onMutate: async (newTable) => {
+      setIsTableCreating(true);
       await utils.tables.getByBaseId.cancel({ baseId });
       const previousTables = utils.tables.getByBaseId.getData({ baseId });
 
@@ -102,6 +107,7 @@ export function AddTableDropdown({
     },
 
     onSuccess: (createdTable) => {
+      setIsTableCreating(false);
       onTableCreated(createdTable.id);
       setTableName("");
       onClose();
@@ -111,6 +117,7 @@ export function AddTableDropdown({
     },
 
     onError: (_, __, context) => {
+      setIsTableCreating(false);
       if (context?.previousTables) {
         utils.tables.getByBaseId.setData({ baseId }, context.previousTables);
       }

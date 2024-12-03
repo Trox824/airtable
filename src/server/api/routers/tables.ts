@@ -411,7 +411,7 @@ export const tablesRouter = createTRPCRouter({
 
           // Create rows in smaller batches
           const BATCH_SIZE = 100;
-          const TOTAL_ROWS = 15000;
+          const TOTAL_ROWS = 1000;
 
           for (let i = 0; i < TOTAL_ROWS; i += BATCH_SIZE) {
             await tx.row.createMany({

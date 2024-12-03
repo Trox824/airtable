@@ -10,6 +10,7 @@ import {
   type SortedColumn,
   type FilterCondition,
 } from "../../../Types/types";
+import { TableTabs } from "~/app/_components/home/TableTabs";
 export default function TablePage() {
   const { tableId, baseId, viewId } = useParams();
   const [searchQuery, setSearchQuery] = useState("");
@@ -21,6 +22,7 @@ export default function TablePage() {
   const [filterConditions, setFilterConditions] = useState<FilterCondition[]>(
     [],
   );
+  const [isTableCreating, setIsTableCreating] = useState(false);
 
   const { data: columns, isLoading: loadingColumns } =
     api.columns.getByTableId.useQuery({ tableId: tableId as string });
@@ -75,6 +77,12 @@ export default function TablePage() {
 
   return (
     <div className="relative">
+      <TableTabs
+        tableId={tableId as string}
+        baseId={baseId as string}
+        viewId={viewId as string}
+        setIsTableCreating={setIsTableCreating}
+      />
       <Toolbar
         handleSearch={setSearchQuery}
         openViewBar={openViewBar}
@@ -114,6 +122,8 @@ export default function TablePage() {
             sortConditions={memoizedSortConditions}
             sortedColumns={memoizedSortedColumns}
             filterConditions={memoizedFilterConditions}
+            isTableCreating={isTableCreating}
+            setIsTableCreating={setIsTableCreating}
           />
         </div>
       </div>

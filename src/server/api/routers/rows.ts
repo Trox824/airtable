@@ -8,7 +8,6 @@ import {
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { createTRPCRouter, publicProcedure } from "~/server/api/trpc";
-import { Sql } from "@prisma/client/runtime/library";
 
 // Define RowWithCells using Prisma's types for better integration
 type RowWithCells = Prisma.RowGetPayload<{
@@ -96,43 +95,48 @@ export const rowsRouter = createTRPCRouter({
         });
       }
 
-      const row = await ctx.db.$transaction(async (tx) => {
-        const createdRow = await tx.row.create({
-          data: {
-            tableId: input.tableId,
-            cells: {
-              create: table.columns.map((column) => ({
-                columnId: column.id,
-                valueText: column.type === ColumnType.Text ? "" : null,
-                valueNumber: null,
-              })),
+      const row = await ctx.db.$transaction(
+        async (tx) => {
+          const createdRow = await tx.row.create({
+            data: {
+              tableId: input.tableId,
+              cells: {
+                create: table.columns.map((column) => ({
+                  columnId: column.id,
+                  valueText: column.type === ColumnType.Text ? "" : null,
+                  valueNumber: null,
+                })),
+              },
             },
-          },
-          include: {
-            cells: { include: { column: { select: { type: true } } } },
-          },
-        });
-
-        if (input.sortConditions?.length) {
-          const sortedRow = await tx.row.findUnique({
-            where: { id: createdRow.id },
             include: {
               cells: { include: { column: { select: { type: true } } } },
             },
           });
 
-          if (!sortedRow) {
-            throw new TRPCError({
-              code: "INTERNAL_SERVER_ERROR",
-              message: "Failed to create row",
+          if (input.sortConditions?.length) {
+            const sortedRow = await tx.row.findUnique({
+              where: { id: createdRow.id },
+              include: {
+                cells: { include: { column: { select: { type: true } } } },
+              },
             });
+
+            if (!sortedRow) {
+              throw new TRPCError({
+                code: "INTERNAL_SERVER_ERROR",
+                message: "Failed to create row",
+              });
+            }
+
+            return sortedRow;
           }
 
-          return sortedRow;
-        }
-
-        return createdRow;
-      });
+          return createdRow;
+        },
+        {
+          timeout: 20000, // Increased timeout to 10 seconds
+        },
+      );
 
       return row;
     }),

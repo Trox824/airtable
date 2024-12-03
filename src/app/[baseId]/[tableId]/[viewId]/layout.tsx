@@ -19,7 +19,7 @@ export default async function Layout({ children, params }: LayoutProps) {
       <Suspense fallback={<NavbarSkeleton />}>
         <Navbar BaseId={baseId} />
       </Suspense>
-      <TableTabs tableId={tableId} baseId={baseId} viewId={viewId} />
+
       {children}
     </>
   );
