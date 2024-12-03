@@ -91,22 +91,32 @@ export const useTableConfig = <T extends Row>({
 
       if (columnType === "Number") {
         // Ensure the value is a number or null
-        const numberValue =
-          value !== null && value !== undefined ? Number(value) : null;
-        updateObj.valueNumber = isNaN(numberValue as number)
-          ? null
-          : (numberValue as number);
-        updateObj.valueText = null; // Reset valueText
+        const numberValue = value != null ? Number(value) : null;
+        updateObj.valueNumber = isNaN(numberValue!) ? null : numberValue!;
+        updateObj.valueText = null;
       } else if (columnType === "Text") {
-        // Ensure the value is a string or null
+        // Safely convert value to string, handling all possible types
         const textValue =
-          value !== null && value !== undefined ? String(value) : null;
+          value != null
+            ? typeof value === "string"
+              ? value
+              : typeof value === "number" ||
+                  typeof value === "boolean" ||
+                  typeof value === "bigint" ||
+                  typeof value === "symbol"
+                ? String(value)
+                : typeof value === "function"
+                  ? value.toString()
+                  : typeof value === "object"
+                    ? JSON.stringify(value, null, 2)
+                    : null // Handle any other unexpected types
+            : null;
+
         updateObj.valueText = textValue;
-        updateObj.valueNumber = null; // Reset valueNumber
+        updateObj.valueNumber = null;
       } else {
         // Handle other column types if any
-        // For now, we can ignore or throw an error
-        console.warn(`Unsupported column type: ${columnType}`);
+        console.warn(`Unsupported column type: ${String(columnType)}`);
         return;
       }
 
