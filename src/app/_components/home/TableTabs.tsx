@@ -7,11 +7,14 @@ import React from "react";
 import { useRouter } from "next/navigation";
 import { v4 as uuidv4 } from "uuid";
 import { AddTableDropdown } from "./Table/AddTableDropdown";
+import { TableTabsSkeleton } from "~/app/loading/tableTabsSkeleton";
+
 interface TableTabsProps {
   baseId: string;
   tableId: string;
   viewId: string;
 }
+
 interface TableWithCount {
   id: string;
   name: string;
@@ -25,9 +28,10 @@ interface TableWithCount {
     rows: number;
   };
 }
+
 export function TableTabs({ baseId, tableId, viewId }: TableTabsProps) {
   const router = useRouter();
-  const { data: tables = [] } = api.tables.getByBaseId.useQuery<
+  const { data: tables = [], isLoading } = api.tables.getByBaseId.useQuery<
     TableWithCount[]
   >({ baseId });
 
@@ -156,6 +160,10 @@ export function TableTabs({ baseId, tableId, viewId }: TableTabsProps) {
   useEffect(() => {
     localStorage.setItem(`selectedTable-${baseId}`, selectedTableId);
   }, [selectedTableId, baseId]);
+
+  if (isLoading) {
+    return <TableTabsSkeleton />;
+  }
 
   return (
     <div className="fixed left-0 right-0 top-navbar z-40 h-8 bg-teal-500 text-white">

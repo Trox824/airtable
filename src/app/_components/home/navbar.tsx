@@ -12,6 +12,7 @@ export function Navbar({ BaseId }: NavbarProps) {
   const [newBaseName, setNewBaseName] = useState("newBaseName");
   const [isEditing, setIsEditing] = useState(false);
   const [optimisticName, setOptimisticName] = useState<string | null>(null);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false); // State for mobile menu
 
   const utils = api.useContext();
   const updateBaseMutation = api.base.update.useMutation({
@@ -72,12 +73,23 @@ export function Navbar({ BaseId }: NavbarProps) {
         ? "Error fetching base"
         : (optimisticName ?? base?.name ?? "Untitled Base");
 
+  // If loading, return the skeleton
+  if (isLoading) {
+    return (
+      <header className="fixed left-0 right-0 top-0 z-50 flex h-navbar bg-teal-500 pl-5 pr-4 text-white">
+        {/* ... existing loading skeleton ... */}
+      </header>
+    );
+  }
+
   return (
-    <header className="fixed left-0 right-0 top-0 z-50 flex h-navbar bg-teal-500 pl-5 pr-4 text-white">
-      <div className="flex flex-1">
-        <div className="flex h-full flex-row items-center">
-          <div className="mr-4 h-6 w-6 cursor-pointer rounded-full hover:bg-white">
-            <Link href="/">
+    <header className="fixed left-0 right-0 top-0 z-50 bg-teal-500 text-white">
+      <div className="mx-auto flex h-navbar max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
+        {/* Left Section: Logo and Base Name */}
+        <div className="flex items-center">
+          <Link href="/" className="flex items-center space-x-2">
+            <div className="flex h-6 w-6 cursor-pointer items-center justify-center rounded-full hover:bg-white/20">
+              {/* Logo SVG */}
               <svg
                 width="24"
                 height="20.4"
@@ -86,6 +98,7 @@ export function Navbar({ BaseId }: NavbarProps) {
                 style={{ shapeRendering: "geometricPrecision" }}
                 className="mr-1"
               >
+                {/* ... existing SVG paths ... */}
                 <g>
                   <path
                     fill="hsla(0, 0%, 100%, 0.95)"
@@ -101,120 +114,127 @@ export function Navbar({ BaseId }: NavbarProps) {
                   />
                 </g>
               </svg>
-            </Link>
-          </div>
-          <div className="group group-hover:opacity-100"></div>
-          <div className="flex w-fit flex-row items-center">
-            {isEditing ? (
-              <input
-                type="text"
-                value={newBaseName}
-                onChange={(e) => setNewBaseName(e.target.value)}
-                onKeyDown={handleUpdateBaseName}
-                onBlur={handleUpdateBaseName}
-                className="w-40 border-none bg-transparent"
-                autoFocus
-              />
-            ) : (
-              <span className="mr-1 text-[17px] font-semibold">{baseName}</span>
-            )}
-            <svg
-              width="16"
-              height="16"
-              viewBox="0 0 16 16"
-              className="icon fill-at-half-black/70 flex-none"
-              onClick={() => setIsEditing(true)}
-            >
-              <path
-                fill="currentColor"
-                d="M4 6l4 4 4-4H4z" // Down arrow path
-              />
-            </svg>
-          </div>
+            </div>
+            <div className="flex items-center space-x-1">
+              {isEditing ? (
+                <input
+                  type="text"
+                  value={newBaseName}
+                  onChange={(e) => setNewBaseName(e.target.value)}
+                  onKeyDown={handleUpdateBaseName}
+                  onBlur={handleUpdateBaseName}
+                  className="w-40 border-none bg-transparent text-sm font-semibold text-white focus:outline-none"
+                  autoFocus
+                />
+              ) : (
+                <span className="text-lg font-semibold">{baseName}</span>
+              )}
+              <button
+                onClick={() => setIsEditing(true)}
+                className="focus:outline-none"
+                aria-label="Edit Base Name"
+              >
+                <svg
+                  width="16"
+                  height="16"
+                  viewBox="0 0 16 16"
+                  className="icon fill-at-half-black/70 flex-none"
+                >
+                  <path
+                    fill="currentColor"
+                    d="M4 6l4 4 4-4H4z" // Down arrow path
+                  />
+                </svg>
+              </button>
+            </div>
+          </Link>
         </div>
 
-        {/* Navigation Links */}
-        <nav className="flex items-center px-[15px]">
-          <div className="flex h-auto flex-row">
-            {["Data", "Automations", "Interfaces"].map((item) => (
-              <div
-                key={item}
-                className={`mr-[8px] flex h-7 cursor-pointer flex-row items-center rounded-full px-3 text-black/65 ${item === "Data" ? "bg-black/10" : ""}`}
-              >
-                <Link className="flex items-center" href="/">
-                  <p className="text-[13px] text-white">{item}</p>
-                </Link>
-              </div>
-            ))}
-          </div>
-          <div className="ml-[3px] h-5 border-r-[1px] border-white/10" />
-          <div>
-            <div className="mr-2 flex h-7 cursor-pointer flex-row items-center rounded-full px-6 text-black/65 hover:bg-black/10">
-              <Link className="flex items-center" href="/">
-                <p className="text-[13px] text-white">Forms</p>
-              </Link>
-            </div>
-          </div>
+        {/* Middle Section: Navigation Links (hidden on mobile) */}
+        <nav className="hidden items-center space-x-4 md:flex">
+          {["Data", "Automations", "Interfaces"].map((item) => (
+            <Link
+              key={item}
+              href="/"
+              className="rounded-full px-3 py-2 hover:bg-black/10"
+            >
+              <span className="text-sm font-medium text-white">{item}</span>
+            </Link>
+          ))}
+          <Link
+            href="/"
+            className="ml-2 rounded-full px-3 py-2 hover:bg-black/10"
+          >
+            <span className="text-sm font-medium text-white">Forms</span>
+          </Link>
         </nav>
 
-        {/* Right section with icons and profile */}
-        <div className="flex flex-1 items-center justify-end">
-          <div className="flex h-7 cursor-pointer flex-row items-center rounded-full px-3 text-black/65 hover:bg-black/10"></div>
-          <div className="flex h-7 cursor-pointer flex-row items-center rounded-full px-3 text-[13px] font-normal text-white hover:bg-black/10">
+        {/* Right Section: Icons and Profile */}
+        <div className="flex items-center space-x-4">
+          {/* Help */}
+          <Link
+            href="/help"
+            className="flex items-center space-x-1 rounded-full px-3 py-2 hover:bg-black/10"
+          >
             <svg
               width="16"
               height="16"
               viewBox="0 0 16 16"
-              className="icon mr-1 flex-none"
+              className="flex-none"
+              style={{ shapeRendering: "geometricPrecision" }}
             >
               <path
                 fill="#FFFFFF"
                 d="M8 0C3.6 0 0 3.6 0 8s3.6 8 8 8 8-3.6 8-8-3.6-8-8-8zm0 14c-3.3 0-6-2.7-6-6s2.7-6 6-6 6 2.7 6 6-2.7 6-6 6zm0-10c-1.4 0-2.5 1.1-2.5 2.5h1.5c0-.6.4-1 1-1s1 .4 1 1c0 1-1.5 1.5-1.5 2.5v.5h1.5v-.5c0-.5 1.5-1 1.5-2.5 0-1.4-1.1-2.5-2.5-2.5zM7.3 11h1.5v-1.5H7.3z"
               />
             </svg>
-            <span className="hover:text-white/100">Help</span>
+            <span className="text-sm">Help</span>
+          </Link>
+
+          {/* Trial Info */}
+          <div className="hidden items-center rounded-2xl bg-black/10 px-3 py-1 text-sm shadow lg:flex">
+            <span>Trial: 12 days left</span>
           </div>
-          <div className="bg:black/10 mx-4 rounded-2xl bg-black/10 px-3 py-[6px] text-[13px] font-normal shadow">
-            Trial: 12 days left
-          </div>
-          <div className="flex h-7 cursor-pointer flex-row items-center text-black/65">
-            <span className="mr-2 flex items-center rounded-2xl bg-white px-3 py-1 text-[13px] text-teal-500 shadow">
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                width="16"
-                height="16"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                className="mr-1 flex-none"
-              >
-                <path d="M18 20c0-3.37-2-6.5-4-8a5 5 0 0 0-.45-8.3"></path>
-                <circle cx="10" cy="8" r="5"></circle>
-                <path d="M22 20c0-3.37-2-6.5-4-8a5 5 0 0 0-.45-8.3"></path>
-              </svg>
-              Share
-            </span>
-          </div>
-          <div className="mx-[7px] flex h-7 items-center rounded-full bg-white">
-            <div className="flex w-7 cursor-pointer items-center justify-center text-black/65">
-              <svg
-                width="16"
-                height="16"
-                viewBox="0 0 16 16"
-                className="flex-none"
-                style={{ shapeRendering: "geometricPrecision" }}
-              >
-                <path
-                  fill="currentColor"
-                  d="M8 16c1.1 0 2-.9 2-2H6c0 1.1.9 2 2 2zm6-5c-.55 0-1-.45-1-1V6c0-2.76-2.24-5-5-5S3 3.24 3 6v4c0 .55-.45 1-1 1s-1 .45-1 1 .45 1 1 1h12c.55 0 1-.45 1-1s-.45-1-1-1z"
-                />
-              </svg>
-            </div>
-          </div>
-          <div className="ml-2 flex h-7 items-center justify-center">
+
+          {/* Share Button */}
+          <button className="flex items-center space-x-1 rounded-full bg-white px-3 py-1 text-sm text-teal-500 shadow hover:bg-white/90">
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className="flex-none"
+            >
+              <path d="M18 20c0-3.37-2-6.5-4-8a5 5 0 0 0-.45-8.3"></path>
+              <circle cx="10" cy="8" r="5"></circle>
+              <path d="M22 20c0-3.37-2-6.5-4-8a5 5 0 0 0-.45-8.3"></path>
+            </svg>
+            <span>Share</span>
+          </button>
+
+          {/* Notification Icon */}
+          <button className="flex items-center rounded-full bg-white p-2 hover:bg-gray-100">
+            <svg
+              width="16"
+              height="16"
+              viewBox="0 0 16 16"
+              className="flex-none text-black/65"
+              style={{ shapeRendering: "geometricPrecision" }}
+            >
+              <path
+                fill="currentColor"
+                d="M8 16c1.1 0 2-.9 2-2H6c0 1.1.9 2 2 2zm6-5c-.55 0-1-.45-1-1V6c0-2.76-2.24-5-5-5S3 3.24 3 6v4c0 .55-.45 1-1 1s-1 .45-1 1 .45 1 1 1h12c.55 0 1-.45 1-1s-.45-1-1-1z"
+              />
+            </svg>
+          </button>
+
+          {/* Profile Image */}
+          <Link href="/profile" className="ml-2">
             <img
               alt="Profile"
               width="28"
@@ -222,9 +242,100 @@ export function Navbar({ BaseId }: NavbarProps) {
               className="h-7 w-7 cursor-pointer rounded-full border-[0.8px] border-white"
               src="/_next/image?url=https%3A%2F%2Flh3.googleusercontent.com%2Fa%2FACg8ocJBWlVosOkWx23ztU8OtChxKKDvhuSvtxpCJGpc12QE38OBIA%3Ds96-c&w=64&q=75"
             />
-          </div>
+          </Link>
+
+          {/* Mobile Menu Button */}
+          <button
+            className="flex items-center justify-center rounded-full p-2 hover:bg-black/10 md:hidden"
+            onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+            aria-label="Toggle Menu"
+            aria-expanded={isMobileMenuOpen}
+          >
+            {isMobileMenuOpen ? (
+              // Close Icon
+              <svg
+                width="24"
+                height="24"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className="text-white"
+              >
+                <line x1="18" y1="6" x2="6" y2="18" />
+                <line x1="6" y1="6" x2="18" y2="18" />
+              </svg>
+            ) : (
+              // Hamburger Icon
+              <svg
+                width="24"
+                height="24"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className="text-white"
+              >
+                <line x1="3" y1="12" x2="21" y2="12" />
+                <line x1="3" y1="6" x2="21" y2="6" />
+                <line x1="3" y1="18" x2="21" y2="18" />
+              </svg>
+            )}
+          </button>
         </div>
       </div>
+
+      {/* Mobile Menu */}
+      {isMobileMenuOpen && (
+        <div className="bg-teal-500 text-white md:hidden">
+          <nav className="space-y-1 px-4 pb-4 pt-2">
+            {["Data", "Automations", "Interfaces", "Forms"].map((item) => (
+              <Link
+                key={item}
+                href="/"
+                className="block rounded px-3 py-2 hover:bg-black/10"
+                onClick={() => setIsMobileMenuOpen(false)} // Close menu on link click
+              >
+                {item}
+              </Link>
+            ))}
+            {/* Additional Links or Actions */}
+            <Link
+              href="/help"
+              className="block rounded px-3 py-2 hover:bg-black/10"
+              onClick={() => setIsMobileMenuOpen(false)}
+            >
+              Help
+            </Link>
+            <Link
+              href="/share"
+              className="block rounded px-3 py-2 hover:bg-black/10"
+              onClick={() => setIsMobileMenuOpen(false)}
+            >
+              Share
+            </Link>
+            {/* Profile and Other Links */}
+            <Link
+              href="/profile"
+              className="flex items-center space-x-2 rounded px-3 py-2 hover:bg-black/10"
+              onClick={() => setIsMobileMenuOpen(false)}
+            >
+              <img
+                alt="Profile"
+                width="28"
+                height="28"
+                className="h-6 w-6 rounded-full border-[0.5px] border-white"
+                src="/_next/image?url=https%3A%2F%2Flh3.googleusercontent.com%2Fa%2FACg8ocJBWlVosOkWx23ztU8OtChxKKDvhuSvtxpCJGpc12QE38OBIA%3Ds96-c&w=64&q=75"
+              />
+              <span>Profile</span>
+            </Link>
+          </nav>
+        </div>
+      )}
     </header>
   );
 }

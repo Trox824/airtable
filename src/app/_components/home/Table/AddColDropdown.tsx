@@ -75,7 +75,7 @@ export function AddColumnDropdown({
   return (
     <div
       ref={dropdownRef}
-      className="absolute z-50 w-64 rounded-md bg-white p-4 shadow-lg ring-1 ring-black ring-opacity-5"
+      className="absolute z-50 w-64 rounded bg-white p-4 shadow-lg ring-1 ring-black ring-opacity-5"
       style={{
         [dropdownPosition.vertical === "top" ? "bottom" : "top"]: "10px",
         [dropdownPosition.horizontal === "right" ? "right" : "left"]: "0",
@@ -87,12 +87,12 @@ export function AddColumnDropdown({
           <input
             type="text"
             name="name"
-            className="mt-1 block w-full rounded-md border border-gray-300 px-2 py-1.5 text-[13px] font-normal text-gray-700 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+            className="mt-1 block w-full rounded border border-gray-300 px-2 py-1.5 text-[13px] font-normal text-gray-700 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
             placeholder="Field Name"
             required
           />
         </div>
-        <div className="mt-2 flex flex-col rounded-md border p-1 shadow">
+        <div className="mt-2 flex flex-col rounded border p-1 shadow">
           <button
             type="submit"
             onClick={(e) => {
@@ -104,7 +104,7 @@ export function AddColumnDropdown({
                 onCreateColumn(name, "Text");
               }
             }}
-            className="cursor-pointer rounded-md p-1 pl-4 text-left text-[13px] font-normal text-gray-700 hover:bg-gray-100"
+            className="cursor-pointer rounded p-1 pl-4 text-left text-[13px] font-normal text-gray-700 hover:bg-gray-100"
           >
             Text
           </button>
@@ -119,7 +119,7 @@ export function AddColumnDropdown({
                 onCreateColumn(name, "Number");
               }
             }}
-            className="cursor-pointer rounded-md p-1 pl-4 text-left text-[13px] font-normal text-gray-700 hover:bg-gray-100"
+            className="cursor-pointer rounded p-1 pl-4 text-left text-[13px] font-normal text-gray-700 hover:bg-gray-100"
           >
             Number
           </button>
