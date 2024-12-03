@@ -48,11 +48,9 @@ export function useTableQuery(
       sortConditions: sortConditions.map((condition) => ({
         columnId: condition.columnId,
         order:
-          condition.order === "0-9"
-            ? "asc"
-            : condition.order === "9-0"
-              ? "desc"
-              : condition.order,
+          condition.order === "0-9" || condition.order === "asc"
+            ? ("asc" as const)
+            : ("desc" as const),
       })),
       filterConditions: filterConditions.map((condition) => ({
         columnId: condition.columnId,

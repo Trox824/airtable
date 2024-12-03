@@ -106,48 +106,55 @@ export const TableBody = memo(function TableBody({
 
       {virtualRows.map((virtualRow) => {
         const row = allRows[virtualRow.index];
-        if (!row || virtualRow.index >= allRows.length) return null;
+        const isPlaceholder = row?.id === "placeholder";
 
         return (
           <tr
-            key={row.id}
+            key={virtualRow.key}
             data-index={virtualRow.index}
-            className="group flex h-8 transition-colors hover:bg-gray-100"
+            ref={virtualizer.measureElement}
+            className={`group flex h-8 transition-colors hover:bg-gray-100`}
             style={{
-              width: table.getCenterTotalSize(),
               position: "absolute",
               top: 0,
               transform: `translateY(${virtualRow.start}px)`,
+              width: table.getCenterTotalSize(),
             }}
           >
-            {row.getVisibleCells().map((cell) => {
-              const value = cell.getValue();
-              const isSorted = isColumnSorted(cell.column.id);
-              const isFiltered = isColumnFiltered(cell.column.id);
+            {isPlaceholder ? (
+              <td colSpan={columns.length} className="p-2 text-center">
+                Loading more records...
+              </td>
+            ) : (
+              row?.getVisibleCells().map((cell) => {
+                const value = cell.getValue();
+                const isSorted = isColumnSorted(cell.column.id);
+                const isFiltered = isColumnFiltered(cell.column.id);
 
-              return (
-                <td
-                  key={cell.id}
-                  className={`flex overflow-scroll whitespace-nowrap border-b-[0.8px] border-r-[0.8px] text-[13px] font-normal [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden ${
-                    isFiltered
-                      ? "bg-orange-300/40 hover:bg-orange-300/60"
-                      : isSorted
-                        ? "bg-blue-200 hover:bg-blue-300"
-                        : "bg-white hover:bg-gray-100"
-                  }`}
-                  style={{
-                    width: cell.column.getSize(),
-                  }}
-                  onClick={() => {
-                    if (cell.column.id !== "select") {
-                      setEditing(true);
-                    }
-                  }}
-                >
-                  {renderCell(cell, value)}
-                </td>
-              );
-            })}
+                return (
+                  <td
+                    key={cell.id}
+                    className={`flex overflow-scroll whitespace-nowrap border-b-[0.8px] border-r-[0.8px] text-[13px] font-normal [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden ${
+                      isFiltered
+                        ? "bg-orange-300/40 hover:bg-orange-300/60"
+                        : isSorted
+                          ? "bg-blue-200 hover:bg-blue-300"
+                          : "bg-white hover:bg-gray-100"
+                    }`}
+                    style={{
+                      width: cell.column.getSize(),
+                    }}
+                    onClick={() => {
+                      if (cell.column.id !== "select") {
+                        setEditing(true);
+                      }
+                    }}
+                  >
+                    {renderCell(cell, value)}
+                  </td>
+                );
+              })
+            )}
           </tr>
         );
       })}

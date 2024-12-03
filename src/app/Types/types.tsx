@@ -13,7 +13,7 @@ export type SimpleColumn = {
 };
 export type SortCondition = {
   columnId: string;
-  order: "asc" | "desc" | "0-9" | "9-0";
+  order: "0-9" | "9-0" | "asc" | "desc";
 };
 // Column type
 export interface TableColumn {
