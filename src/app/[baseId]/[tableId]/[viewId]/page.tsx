@@ -1,13 +1,15 @@
 "use client";
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useMemo } from "react";
 import Toolbar from "~/app/_components/home/ToolBar/toolBar";
 import ViewSideBar from "~/app/_components/home/Table/ViewSideBar";
 import { DataTable } from "~/app/_components/home/Table/DataTable";
 import { useParams } from "next/navigation";
 import { api } from "~/trpc/react";
-import { type SortCondition } from "~/app/_components/home/ToolBar/SortModal";
-import { SortedColumn } from "~/app/_components/home/Table/types";
-import { type FilterCondition } from "~/app/_components/home/Table/types";
+import {
+  type SortCondition,
+  type SortedColumn,
+  type FilterCondition,
+} from "../../../Types/types";
 export default function TablePage() {
   const { tableId, baseId, viewId } = useParams();
   const [searchQuery, setSearchQuery] = useState("");
@@ -19,7 +21,6 @@ export default function TablePage() {
   const [filterConditions, setFilterConditions] = useState<FilterCondition[]>(
     [],
   );
-  console.log(filterConditions);
 
   const { data: columns, isLoading: loadingColumns } =
     api.columns.getByTableId.useQuery({ tableId: tableId as string });
@@ -58,6 +59,20 @@ export default function TablePage() {
     setSortConditions(conditions);
   }, []);
 
+  const memoizedColumns = useMemo(() => columns, [columns]);
+  const memoizedSortConditions = useMemo(
+    () => sortConditions,
+    [sortConditions],
+  );
+  const memoizedSortedColumns = useMemo(() => sortedColumns, [sortedColumns]);
+  const memoizedFilterConditions = useMemo(
+    () => filterConditions,
+    [filterConditions],
+  );
+
+  const memoizedTableId = useMemo(() => tableId as string, [tableId]);
+  const memoizedSearchQuery = useMemo(() => searchQuery, [searchQuery]);
+
   return (
     <div className="relative">
       <Toolbar
@@ -68,13 +83,13 @@ export default function TablePage() {
         setOpenSortModal={setOpenSortModal}
         openFilterModal={openFilterModal}
         setOpenFilterModal={setOpenFilterModal}
-        columns={columns}
+        columns={memoizedColumns}
         loadingColumns={loadingColumns}
         onSort={handleSort}
         viewId={viewId as string}
-        sortConditions={sortConditions}
+        sortConditions={memoizedSortConditions}
         setSortedColumns={setSortedColumns}
-        filterConditions={filterConditions}
+        filterConditions={memoizedFilterConditions}
         setFilterConditions={setFilterConditions}
       />
       <div className="mt-[calc(theme(spacing.navbar)+2rem+theme(spacing.toolbar))] flex">
@@ -90,17 +105,15 @@ export default function TablePage() {
             />
           )}
         </div>
-
-        {/* Main content */}
         <div className="flex-1">
           <DataTable
-            tableId={tableId as string}
-            searchQuery={searchQuery}
-            columns={columns}
+            tableId={memoizedTableId}
+            searchQuery={memoizedSearchQuery}
+            columns={memoizedColumns}
             loadingColumns={loadingColumns}
-            sortConditions={sortConditions}
-            sortedColumns={sortedColumns}
-            filterConditions={filterConditions}
+            sortConditions={memoizedSortConditions}
+            sortedColumns={memoizedSortedColumns}
+            filterConditions={memoizedFilterConditions}
           />
         </div>
       </div>

@@ -1,6 +1,6 @@
 import { type Table, flexRender, type ColumnDef } from "@tanstack/react-table";
 
-import { type Row, type ColumnMeta, SortedColumn } from "./types";
+import { type Row, type ColumnMeta, SortedColumn } from "../../../Types/types";
 import { AddColumnDropdown } from "./AddColDropdown";
 import { type ColumnType } from "@prisma/client";
 import { RefObject, Dispatch, SetStateAction, useMemo, useState } from "react";

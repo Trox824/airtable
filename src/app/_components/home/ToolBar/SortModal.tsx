@@ -5,13 +5,9 @@ import {
   LucideSearch,
 } from "lucide-react";
 import { useState } from "react";
-import { SimpleColumn, SortedColumn } from "../Table/types";
+import { SimpleColumn, SortedColumn } from "../../../Types/types";
 import { api } from "~/trpc/react";
-
-export type SortCondition = {
-  columnId: string;
-  order: "asc" | "desc";
-};
+import { type SortCondition } from "../../../Types/types";
 
 interface SortModalProps {
   columns: SimpleColumn[] | undefined;
@@ -43,17 +39,30 @@ export function SortModal({
   );
 
   const utils = api.useUtils();
+  console.log(sortConditions);
   const updateSort = api.view.updateSort.useMutation({
     onSuccess: () => {
-      // Optionally invalidate queries that depend on this data
       void utils.view.invalidate();
     },
   });
 
-  const handleSortOrderChange = (index: number, order: "asc" | "desc") => {
-    const newConditions = sortConditions.map((condition, i) =>
-      i === index ? { ...condition, order } : condition,
-    );
+  const handleSortOrderChange = (
+    index: number,
+    order: "asc" | "desc" | "0-9" | "9-0",
+  ) => {
+    const newConditions = sortConditions.map((condition, i) => {
+      if (i === index) {
+        const selectedColumn = columns?.find(
+          (col) => col.id === condition.columnId,
+        );
+        const isNumberColumn = selectedColumn?.type === "Number";
+        return {
+          ...condition,
+          order: isNumberColumn ? (order === "asc" ? "0-9" : "9-0") : order,
+        };
+      }
+      return condition;
+    });
     setSortConditions(newConditions);
     onSort(newConditions);
 
@@ -62,7 +71,10 @@ export function SortModal({
       viewId,
       sorts: newConditions.map((condition) => ({
         columnId: condition.columnId,
-        direction: condition.order === "asc" ? "Ascending" : "Descending",
+        direction:
+          condition.order === "asc" || condition.order === "0-9"
+            ? "Ascending"
+            : "Descending",
       })),
     });
   };
@@ -81,7 +93,10 @@ export function SortModal({
         .map((col) => ({
           column: col,
           order:
-            newConditions.find((c) => c.columnId === col.id)?.order ?? "asc",
+            newConditions.find((c) => c.columnId === col.id)?.order === "0-9" ||
+            newConditions.find((c) => c.columnId === col.id)?.order === "asc"
+              ? ("asc" as const)
+              : ("desc" as const),
         })) ?? [];
     setSortedColumns(newSortedColumns);
 
@@ -90,7 +105,10 @@ export function SortModal({
       viewId,
       sorts: newConditions.map((condition) => ({
         columnId: condition.columnId,
-        direction: condition.order === "asc" ? "Ascending" : "Descending",
+        direction:
+          condition.order === "asc" || condition.order === "0-9"
+            ? "Ascending"
+            : "Descending",
       })),
     });
   };
@@ -106,7 +124,10 @@ export function SortModal({
     } else {
       newConditions = [
         ...sortConditions,
-        { columnId: column.id, order: "asc" },
+        {
+          columnId: column.id,
+          order: column.type === "Number" ? "0-9" : "asc",
+        },
       ];
     }
     setSortConditions(newConditions);
@@ -114,6 +135,15 @@ export function SortModal({
     setIsSelectingColumn(false);
     setActiveColumnSelection(null);
     setSearchQuery("");
+
+    // Save to database immediately when column is selected
+    void updateSort.mutate({
+      viewId,
+      sorts: newConditions.map((condition) => ({
+        columnId: condition.columnId,
+        direction: condition.order === "asc" ? "Ascending" : "Descending",
+      })),
+    });
   };
 
   const ColumnSelector = ({
@@ -193,14 +223,14 @@ export function SortModal({
                     )
                   }
                 >
-                  <div>Number Column</div>
+                  <div>{selectedColumn?.name ?? "Select Column"}</div>
                   <LucideChevronDown size={16} />
                 </button>
                 {openDropdownIndex === index && (
                   <div className="absolute left-0 top-full z-50 mt-1 min-w-80 rounded-sm border bg-white p-4 shadow-lg">
                     <ColumnSelector
                       onSelect={(column) => {
-                        // Handle the selection
+                        handleColumnSelect(column);
                         setOpenDropdownIndex(null);
                       }}
                     />
@@ -211,7 +241,10 @@ export function SortModal({
                 className="flex w-28 items-center justify-between gap-x-2 rounded-sm border p-2 hover:bg-gray-100"
                 value={condition.order}
                 onChange={(e) =>
-                  handleSortOrderChange(index, e.target.value as "asc" | "desc")
+                  handleSortOrderChange(
+                    index,
+                    e.target.value as "asc" | "desc" | "0-9" | "9-0",
+                  )
                 }
               >
                 <option value="asc">

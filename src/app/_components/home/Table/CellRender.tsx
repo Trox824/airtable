@@ -1,9 +1,9 @@
 import { useEffect, useState } from "react";
 import { type CellContext } from "@tanstack/react-table";
-import { type Row } from "./types";
+import { type Row } from "../../../Types/types";
 import { type ColumnType } from "@prisma/client";
 import { toast } from "sonner";
-import { type ColumnMeta } from "./types";
+import { type ColumnMeta } from "../../../Types/types";
 import { memo } from "react";
 interface CellRendererProps {
   info: CellContext<Row, string | number | null>;

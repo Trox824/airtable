@@ -3,8 +3,12 @@ import { useState, useRef, useEffect } from "react";
 import { SortModal } from "./SortModal";
 import FilterModal from "./FilterModal";
 import { ColumnType } from "@prisma/client";
-import { FilterCondition, SimpleColumn, SortedColumn } from "../Table/types";
-import { type SortCondition } from "./SortModal";
+import {
+  FilterCondition,
+  SimpleColumn,
+  SortedColumn,
+} from "../../../Types/types";
+import { type SortCondition } from "../../../Types/types";
 
 interface ToolbarProps {
   handleSearch: (query: string) => void;
@@ -299,7 +303,11 @@ export default function Toolbar({
                     setSortedColumns([
                       {
                         column: sortedColumn,
-                        order: firstCondition.order,
+                        order:
+                          firstCondition.order === "0-9" ||
+                          firstCondition.order === "asc"
+                            ? "asc"
+                            : "desc",
                         ...sortedColumn,
                       },
                     ]);

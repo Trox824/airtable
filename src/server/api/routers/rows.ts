@@ -171,69 +171,112 @@ export const rowsRouter = createTRPCRouter({
       }),
     )
     .query(async ({ ctx, input }): Promise<PaginatedResponse> => {
-      const {
-        tableId,
-        limit,
-        cursor,
-        searchQuery,
-        sortConditions,
-        filterConditions,
-      } = input;
-
-      // Build where clause
+      // 1. Build basic where clause
       const where: Prisma.RowWhereInput = {
-        tableId,
-        ...(cursor && { id: { gt: cursor } }),
-        ...(searchQuery && {
-          cells: {
-            some: {
-              OR: [
-                { valueText: { contains: searchQuery, mode: "insensitive" } },
-                {
-                  valueNumber: !isNaN(parseNumber(searchQuery)!)
-                    ? { equals: parseNumber(searchQuery) }
-                    : undefined,
-                },
-              ],
-            },
-          },
-        }),
-        ...(filterConditions?.length && {
-          AND: filterConditions.map(({ columnId, ...filter }) => ({
-            cells: { some: { columnId, ...buildFilterCondition(filter) } },
-          })),
-        }),
+        tableId: input.tableId,
+        ...(input.cursor && { id: { gt: input.cursor } }),
       };
 
-      // Build orderBy clause
-      const orderBy: Prisma.RowOrderByWithRelationInput[] =
-        sortConditions?.map(({ columnId, order }) => ({
-          cells: { _count: order },
-        })) ?? [];
-      orderBy.push({ id: "asc" });
+      // 2. Add search condition if provided
+      if (input.searchQuery) {
+        where.cells = {
+          some: {
+            OR: [
+              {
+                valueText: { contains: input.searchQuery, mode: "insensitive" },
+              },
+              {
+                valueNumber: !isNaN(parseFloat(input.searchQuery))
+                  ? { equals: parseFloat(input.searchQuery) }
+                  : undefined,
+              },
+            ],
+          },
+        };
+      }
 
-      // Fetch total count
-      const totalCount = await ctx.db.row.count({ where });
+      // 3. Add filter conditions if provided
+      if (input.filterConditions?.length) {
+        where.AND = input.filterConditions.map(({ columnId, ...filter }) => ({
+          cells: { some: { columnId, ...buildFilterCondition(filter) } },
+        }));
+      }
 
-      // Fetch rows with pagination
-      const rows = await ctx.db.row.findMany({
-        where,
-        take: limit + 1,
-        orderBy,
-        include: {
-          cells: { include: { column: { select: { type: true } } } },
-        },
-      });
+      // 4. Build sort expression that will be used in both SELECT and ORDER BY
+      const sortExpressions =
+        input.sortConditions?.map(
+          (sort, index) => `
+        (SELECT COALESCE("valueNumber"::text, "valueText", '')
+        FROM "Cell" c
+        WHERE c."columnId" = '${sort.columnId}'
+        AND c."rowId" = r.id
+        LIMIT 1) as sort_value_${index}
+      `,
+        ) ?? [];
 
-      // Determine next cursor
+      const orderByClause = input.sortConditions?.length
+        ? input.sortConditions
+            .map(
+              (sort, index) => `sort_value_${index} ${sort.order} NULLS LAST`,
+            )
+            .join(", ")
+        : "r.id ASC";
+
+      // 5. Fetch data using PostgreSQL-specific query
+      const [totalCount, rows] = await Promise.all([
+        ctx.db.row.count({ where }),
+        ctx.db.$queryRaw<RowWithCells[]>`
+          WITH sorted_rows AS (
+            SELECT DISTINCT 
+              r.id,
+              r."tableId",
+              r."createdAt",
+              r."updatedAt"
+              ${
+                sortExpressions.length
+                  ? Prisma.sql`, ${Prisma.sql([sortExpressions.join(", ")])}`
+                  : Prisma.empty
+              }
+            FROM "Row" r
+            WHERE r."tableId" = ${input.tableId}
+            ${input.cursor ? Prisma.sql`AND r.id > ${input.cursor}` : Prisma.empty}
+            ORDER BY ${Prisma.sql([orderByClause])}
+            LIMIT ${input.limit + 1}
+          )
+          SELECT 
+            r.id,
+            r."tableId",
+            r."createdAt",
+            r."updatedAt",
+            COALESCE(
+              jsonb_agg(
+                jsonb_build_object(
+                  'id', c.id,
+                  'rowId', c."rowId",
+                  'columnId', c."columnId",
+                  'valueText', c."valueText",
+                  'valueNumber', c."valueNumber",
+                  'column', jsonb_build_object('type', col.type)
+                )
+              ) FILTER (WHERE c.id IS NOT NULL),
+              '[]'::jsonb
+            ) as cells
+          FROM sorted_rows r
+          LEFT JOIN "Cell" c ON c."rowId" = r.id
+          LEFT JOIN "Column" col ON col.id = c."columnId"
+          GROUP BY r.id, r."tableId", r."createdAt", r."updatedAt"
+        `,
+      ]);
+
+      // 6. Handle pagination
       let nextCursor: string | undefined;
-      if (rows.length > limit) {
+      if (rows.length > input.limit) {
         const nextItem = rows.pop()!;
         nextCursor = nextItem.id;
       }
 
       return {
-        items: rows as RowWithCells[],
+        items: rows,
         nextCursor,
         totalCount,
       };

@@ -53,12 +53,14 @@ export function AddTableDropdown({
 
       onTableCreated(tempTableId);
 
+      router.push(`/${baseId}/${tempTableId}/${tempViewId}`);
+
       return { previousTables, tempTableId, tempViewId };
     },
     onSuccess: (result) => {
       onClose();
-      if (result.id) {
-        router.push(`/${baseId}/${result.id}/${result.views[0]?.id}`);
+      if (result.id && result.views?.[0]?.id) {
+        router.replace(`/${baseId}/${result.id}/${result.views[0].id}`);
       }
     },
     onError: (error, _, context) => {

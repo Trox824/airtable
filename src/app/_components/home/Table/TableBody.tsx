@@ -6,7 +6,7 @@ import {
   type Table,
   type Cell,
 } from "@tanstack/react-table";
-import { FilterCondition, SortedColumn, type Row } from "./types";
+import { FilterCondition, SortedColumn, type Row } from "../../../Types/types";
 import { CellRenderer } from "./CellRender";
 import { useVirtualizer } from "@tanstack/react-virtual";
 
@@ -40,8 +40,6 @@ export const TableBody = memo(function TableBody({
         table,
         cell: cell,
       } as CellContext<Row, string | number | null>;
-
-      console.log(`Data type of cell value: ${typeof value}`);
 
       if (cell.column.id === "select") {
         return (
@@ -80,7 +78,6 @@ export const TableBody = memo(function TableBody({
       : 0;
 
   const allRows = table.getRowModel().rows;
-  console.log(sortedColumns);
   const isColumnSorted = useCallback(
     (columnId: string) => {
       return sortedColumns.some(
@@ -165,7 +162,7 @@ export const TableBody = memo(function TableBody({
       )}
 
       <tr
-        className="flex h-8 cursor-pointer border-b-[0.8px] border-r-[0.8px] bg-white hover:bg-[#f8f8f8]"
+        className="flex cursor-pointer border-b-[0.8px] border-r-[0.8px] bg-white hover:bg-[#f8f8f8]"
         onClick={handleAddRow}
         style={{
           width: table.getCenterTotalSize(),

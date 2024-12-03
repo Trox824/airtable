@@ -411,7 +411,7 @@ export const tablesRouter = createTRPCRouter({
 
           // Create rows in smaller batches
           const BATCH_SIZE = 100;
-          const TOTAL_ROWS = 1000;
+          const TOTAL_ROWS = 15000;
 
           for (let i = 0; i < TOTAL_ROWS; i += BATCH_SIZE) {
             await tx.row.createMany({
@@ -446,7 +446,10 @@ export const tablesRouter = createTRPCRouter({
             });
           }
 
-          return table;
+          return {
+            ...table,
+            view: table.views[0], // Return the first view as the default
+          };
         },
         {
           timeout: 300000,

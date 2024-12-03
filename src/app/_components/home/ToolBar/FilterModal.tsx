@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from "react";
 import { ChevronDown, Plus, Trash2 } from "lucide-react";
-import { SimpleColumn, FilterCondition } from "../Table/types";
+import { SimpleColumn, FilterCondition } from "../../../Types/types";
 import { api } from "~/trpc/react";
 import { ColumnType, FilterOperator } from "@prisma/client";
 
@@ -27,7 +27,7 @@ const FilterModal: React.FC<FilterModalProps> = ({
         columns?.find((col) => col.id === condition.columnId) ?? null,
     ),
   );
-  console.log(filterConditions);
+
   const [openDropdowns, setOpenDropdowns] = useState<Record<number, boolean>>(
     {},
   );
@@ -212,7 +212,6 @@ const FilterModal: React.FC<FilterModalProps> = ({
     newInputValues[index] = value;
     setInputValues(newInputValues);
   };
-  console.log(selectedColumns, selectedOperators, inputValues);
   const handleApplyFilter = () => {
     const newConditions = selectedColumns
       .slice(0, visibleFilterForms)

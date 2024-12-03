@@ -11,6 +11,10 @@ export type SimpleColumn = {
   id: string;
   type: ColumnType;
 };
+export type SortCondition = {
+  columnId: string;
+  order: "asc" | "desc" | "0-9" | "9-0";
+};
 // Column type
 export interface TableColumn {
   type: ColumnType;
@@ -38,12 +42,6 @@ export interface Cell {
   valueNumber: number | null;
   column: {
     type: ColumnType;
-    name: string;
-    id: string;
-    tableId: string;
-    createdAt: Date;
-    updatedAt: Date;
-    columnDef: ColumnDef<Row, string | number | null> | null;
   };
   columnId: string;
   rowId: string;
