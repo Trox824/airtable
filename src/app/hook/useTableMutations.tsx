@@ -172,8 +172,8 @@ export function useTableMutations(
   const updateCell = api.cells.update.useMutation({
     onMutate: async (newCell: {
       id: string;
-      valueText?: string;
-      valueNumber?: number;
+      valueText?: string | null;
+      valueNumber?: number | null;
     }) => {
       await utils.rows.getByTableId.cancel({
         tableId,
@@ -212,8 +212,18 @@ export function useTableMutations(
                   cell.id === newCell.id
                     ? {
                         ...cell,
-                        valueText: newCell.valueText ?? cell.valueText,
-                        valueNumber: newCell.valueNumber ?? cell.valueNumber,
+                        valueText:
+                          newCell.valueNumber !== undefined
+                            ? null
+                            : newCell.valueText !== undefined
+                              ? newCell.valueText
+                              : cell.valueText,
+                        valueNumber:
+                          newCell.valueText !== undefined
+                            ? null
+                            : newCell.valueNumber !== undefined
+                              ? newCell.valueNumber
+                              : cell.valueNumber,
                       }
                     : cell,
                 ),

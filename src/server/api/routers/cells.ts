@@ -3,8 +3,8 @@ import { z } from "zod";
 import { createTRPCRouter, publicProcedure } from "~/server/api/trpc";
 
 const cellInput = z.object({
-  valueText: z.string().optional(),
-  valueNumber: z.number().optional(),
+  valueText: z.string().nullable().optional(),
+  valueNumber: z.number().nullable().optional(),
 });
 
 export const cellsRouter = createTRPCRouter({

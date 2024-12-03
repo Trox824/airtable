@@ -21,8 +21,8 @@ import { type Row } from "../../../Types/types";
 
 interface UpdateCellParams {
   id: string;
-  valueText?: string;
-  valueNumber?: number;
+  valueText?: string | null;
+  valueNumber?: number | null;
 }
 
 interface DataTableProps {

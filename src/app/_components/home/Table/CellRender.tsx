@@ -50,16 +50,18 @@ export const CellRenderer = memo(function CellRenderer({
     const newValue = e.target.value;
 
     if (columnType.type === "Number") {
-      if (newValue === "" || !isNaN(Number(newValue))) {
-        setValue(newValue === "" ? null : Number(newValue));
+      if (newValue === "") {
+        setValue(null);
       } else {
-        toast.error("This column only accepts numbers");
-        setValue(value);
+        const parsedNumber = Number(newValue);
+        if (!isNaN(parsedNumber)) {
+          setValue(parsedNumber);
+        } else {
+          toast.error("This column only accepts numbers");
+        }
       }
     } else if (columnType.type === "Text") {
       setValue(newValue);
-    } else {
-      toast.error("Invalid input type");
     }
   };
 
