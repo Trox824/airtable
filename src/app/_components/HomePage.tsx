@@ -203,10 +203,10 @@ const HomePage: React.FC = () => {
   return (
     <div className="absolute h-full w-full overflow-hidden bg-[#F9FAFB]">
       {/* Navbar */}
-      <div className="z-20 flex h-12 w-full flex-row items-center justify-between border-b-[1px] border-black/10 bg-white px-4">
+      <div className="z-20 flex h-12 w-full flex-row items-center justify-between border-b-[1px] border-black/10 bg-white px-2 sm:px-4">
         {/* Left section */}
         <div className="flex">
-          <div className="h-8">
+          <div className="h-8 sm:block">
             <svg
               xmlns="http://www.w3.org/2000/svg"
               width="100%"
@@ -232,7 +232,7 @@ const HomePage: React.FC = () => {
               ></path>
             </svg>
           </div>
-          <div className="flex items-center pl-1">
+          <div className="hidden items-center pl-1 sm:flex">
             <svg
               xmlns="http://www.w3.org/2000/svg"
               width="94"
@@ -249,8 +249,8 @@ const HomePage: React.FC = () => {
         </div>
 
         {/* Center section - Search */}
-        <div className="flex max-w-2xl flex-1 justify-center px-4">
-          <div className="flex w-[354px]">
+        <div className="flex max-w-2xl flex-1 justify-center px-2 sm:px-4">
+          <div className="flex w-full sm:w-[354px]">
             <div className="undefined flex w-full flex-row items-center">
               <div className="hover:shadow-at-main-nav-hover shadow-at-main-nav flex h-8 w-full flex-row items-center rounded-full border border-black/10 px-4">
                 <svg
@@ -279,7 +279,7 @@ const HomePage: React.FC = () => {
 
         {/* Right section */}
         <div className="flex items-center space-x-2">
-          <button className="p-2 text-black/60 hover:text-black/80">
+          <button className="hidden p-2 text-black/60 hover:text-black/80 sm:block">
             <span className="text-sm">Help</span>
           </button>
           <button className="p-2 text-black/60 hover:text-black/80">
@@ -292,7 +292,7 @@ const HomePage: React.FC = () => {
           </div>
           <button
             onClick={handleLogout}
-            className="p-2 text-red-600 hover:text-red-800"
+            className="hidden p-2 text-red-600 hover:text-red-800 sm:block"
           >
             Logout
           </button>
@@ -332,13 +332,13 @@ const HomePage: React.FC = () => {
         </div>
 
         {/* Main Content */}
-        <div className="flex-1 px-12 pt-8">
+        <div className="flex-1 px-4 pt-8 sm:px-8 lg:px-12">
           <h1 className="font-main-content-sans text-at-half-black pb-6 text-[27px] font-[675] leading-[1.26]">
             Home
           </h1>
 
           {/* Action Cards Grid */}
-          <div className="mb-6 grid w-full grid-cols-[repeat(auto-fit,minmax(250px,1fr))] gap-4">
+          <div className="mb-6 grid w-full grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
             {/* Start with AI Card */}
             <a href="">
               <div className="h-full rounded-md border border-black/10 bg-white p-4">
@@ -530,7 +530,7 @@ const HomePage: React.FC = () => {
           </div>
 
           {/* Base Grid */}
-          <div className="grid w-full grid-cols-4 gap-4">
+          <div className="grid w-full grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
             {isLoading ? (
               <LoadingSkeletons />
             ) : (

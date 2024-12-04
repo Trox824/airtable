@@ -1,20 +1,8 @@
 import { TRPCError } from "@trpc/server";
-import { getServerSession } from "next-auth";
 import { z } from "zod";
 import { createTRPCRouter, publicProcedure } from "~/server/api/trpc";
 import { PrismaClient } from "@prisma/client";
 import { faker } from "@faker-js/faker";
-import { v4 as uuidv4 } from "uuid";
-
-// Add this interface at the top of the file
-interface TableCreateInput {
-  baseId: string;
-  name: string;
-  view?: {
-    id: string;
-    name: string;
-  };
-}
 
 const validateTable = async (db: PrismaClient, tableId: string) => {
   console.log("Validating table:", tableId);
@@ -64,78 +52,83 @@ export const tablesRouter = createTRPCRouter({
         });
       }
 
-      return ctx.db.$transaction(async (tx) => {
-        // Create table with nested view creation
-        const table = await tx.table.create({
-          data: {
-            baseId: input.baseId,
-            name: input.name,
-            views: {
-              create: {
-                name: "Grid view",
+      return ctx.db.$transaction(
+        async (tx) => {
+          // Create table with nested view creation
+          const table = await tx.table.create({
+            data: {
+              baseId: input.baseId,
+              name: input.name,
+              views: {
+                create: {
+                  name: "Grid view",
+                },
               },
             },
-          },
-          include: {
-            views: {
-              select: {
-                id: true,
-                name: true,
+            include: {
+              views: {
+                select: {
+                  id: true,
+                  name: true,
+                },
               },
             },
-          },
-        });
+          });
 
-        // Create two columns
-        await tx.column.createMany({
-          data: [
-            {
-              tableId: table.id,
-              name: "Text Column",
-              type: "Text",
-            },
-            {
-              tableId: table.id,
-              name: "Number Column",
-              type: "Number",
-            },
-          ],
-        });
+          // Create two columns
+          await tx.column.createMany({
+            data: [
+              {
+                tableId: table.id,
+                name: "Text Column",
+                type: "Text",
+              },
+              {
+                tableId: table.id,
+                name: "Number Column",
+                type: "Number",
+              },
+            ],
+          });
 
-        // Get the created columns to access their IDs
-        const createdColumns = await tx.column.findMany({
-          where: { tableId: table.id },
-          orderBy: { createdAt: "asc" },
-        });
+          // Get the created columns to access their IDs
+          const createdColumns = await tx.column.findMany({
+            where: { tableId: table.id },
+            orderBy: { createdAt: "asc" },
+          });
 
-        // Create two rows
-        await tx.row.createMany({
-          data: [{ tableId: table.id }, { tableId: table.id }],
-        });
+          // Create two rows
+          await tx.row.createMany({
+            data: [{ tableId: table.id }, { tableId: table.id }],
+          });
 
-        // Get the created rows to access their IDs
-        const createdRows = await tx.row.findMany({
-          where: { tableId: table.id },
-          orderBy: { createdAt: "asc" },
-        });
+          // Get the created rows to access their IDs
+          const createdRows = await tx.row.findMany({
+            where: { tableId: table.id },
+            orderBy: { createdAt: "asc" },
+          });
 
-        // Create cells for each row-column combination
-        await tx.cell.createMany({
-          data: createdRows.flatMap((row) =>
-            createdColumns.map((column) => ({
-              rowId: row.id,
-              columnId: column.id,
-              valueText: column.type === "Text" ? "" : null,
-              valueNumber: column.type === "Number" ? null : null,
-            })),
-          ),
-        });
+          // Create cells for each row-column combination
+          await tx.cell.createMany({
+            data: createdRows.flatMap((row) =>
+              createdColumns.map((column) => ({
+                rowId: row.id,
+                columnId: column.id,
+                valueText: column.type === "Text" ? "" : null,
+                valueNumber: column.type === "Number" ? null : null,
+              })),
+            ),
+          });
 
-        return {
-          ...table,
-          view: table.views[0], // Return the first view as the default
-        };
-      });
+          return {
+            ...table,
+            view: table.views[0], // Return the first view as the default
+          };
+        },
+        {
+          timeout: 300000,
+        },
+      );
     }),
   delete: publicProcedure
     .input(z.object({ id: z.string() }))
@@ -411,7 +404,7 @@ export const tablesRouter = createTRPCRouter({
 
           // Create rows in smaller batches
           const BATCH_SIZE = 100;
-          const TOTAL_ROWS = 1000;
+          const TOTAL_ROWS = 10000;
 
           for (let i = 0; i < TOTAL_ROWS; i += BATCH_SIZE) {
             await tx.row.createMany({

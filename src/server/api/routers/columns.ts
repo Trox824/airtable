@@ -33,7 +33,28 @@ export const columnsRouter = createTRPCRouter({
     )
     .mutation(async ({ ctx, input }) => {
       await validateTable(ctx.db, input.tableId);
-      return ctx.db.column.create({ data: input });
+
+      return ctx.db.$transaction(async (tx) => {
+        // Create the column
+        const column = await tx.column.create({ data: input });
+
+        // Create cells for all existing rows
+        await tx.cell.createMany({
+          data: (
+            await tx.row.findMany({
+              where: { tableId: input.tableId },
+              select: { id: true },
+            })
+          ).map((row) => ({
+            columnId: column.id,
+            rowId: row.id,
+            valueText: input.type === ColumnType.Text ? "" : null,
+            valueNumber: null,
+          })),
+        });
+
+        return column;
+      });
     }),
 
   getByTableId: publicProcedure

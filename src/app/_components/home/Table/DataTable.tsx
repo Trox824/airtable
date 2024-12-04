@@ -147,14 +147,8 @@ export const DataTable = memo(
     return (
       <>
         <div className="flex h-[calc(100vh-theme(spacing.navbar)-4.5rem-theme(spacing.toolbar))] flex-1 flex-col bg-[#f8f8f8]">
-          {loadingRows || isTableCreating || rows.length === 0 ? (
-            <TableLoadingState
-              loadingMessage={
-                isTableCreating || rows.length === 0
-                  ? "Loading table..."
-                  : "Loading table..."
-              }
-            />
+          {rows.length === 0 || columns?.length === 0 ? (
+            <TableLoadingState loadingMessage={"Loading table..."} />
           ) : (
             <div className="flex h-full w-full flex-col">
               <div className="flex h-full flex-col">

@@ -2,6 +2,15 @@ import { Search, Grid2x2Plus } from "lucide-react";
 import { api } from "~/trpc/react";
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { v4 as uuidv4 } from "uuid";
+
+type View = {
+  id: string;
+  name: string;
+  tableId: string;
+  createdAt: Date | null;
+  updatedAt: Date | null;
+};
 
 const ViewSideBar = ({
   baseId,
@@ -22,7 +31,9 @@ const ViewSideBar = ({
     tableId,
   });
 
-  const [optimisticViews, setOptimisticViews] = useState(() => views ?? []);
+  const [optimisticViews, setOptimisticViews] = useState<View[]>(
+    () => views ?? [],
+  );
 
   // Update optimisticViews when views data changes
   useEffect(() => {
@@ -33,25 +44,36 @@ const ViewSideBar = ({
 
   const createViewMutation = api.view.create.useMutation({
     onMutate: async (newView) => {
-      const previousViews = views ?? [];
-      setOptimisticViews((old) => [
-        ...old,
-        {
-          id: "temp-id",
-          name: newView.name,
-          tableId: newView.tableId,
-          createdAt: new Date(), // Default value
-          updatedAt: new Date(), // Default value
-        },
-      ]);
+      // Keep the previous views for rollback
+      const previousViews = optimisticViews;
+      const tempId = `temp-${uuidv4()}`;
 
-      // Return a context object with the snapshotted value
-      return { previousViews };
+      const optimisticView = {
+        id: tempId,
+        name: newView.name,
+        tableId: newView.tableId,
+        createdAt: null,
+        updatedAt: null,
+      };
+
+      // Update optimistic views immediately
+      setOptimisticViews((old) => [...old, optimisticView]);
+      router.push(`/${baseId}/${tableId}/${tempId}`);
+
+      return { previousViews, tempId };
+    },
+    onSuccess: (newView, variables, context) => {
+      // Update the temporary view with the real one
+      setOptimisticViews((current) =>
+        current.map((view) => (view.id === context?.tempId ? newView : view)),
+      );
+      router.push(`/${baseId}/${tableId}/${newView.id}`);
+      refetch(); // Add this to ensure we have the latest data
     },
     onError: (err, newView, context) => {
-      // Rollback to the previous value if context is available
       if (context?.previousViews) {
         setOptimisticViews(context.previousViews);
+        router.push(`/${baseId}/${tableId}/${viewId}`);
       }
     },
   });
