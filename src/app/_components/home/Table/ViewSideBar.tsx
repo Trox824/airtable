@@ -43,8 +43,7 @@ const ViewSideBar = ({
   }, [views]);
 
   const createViewMutation = api.view.create.useMutation({
-    onMutate: async (newView) => {
-      // Keep the previous views for rollback
+    onMutate: (newView) => {
       const previousViews = optimisticViews;
       const tempId = `temp-${uuidv4()}`;
 
@@ -56,19 +55,17 @@ const ViewSideBar = ({
         updatedAt: null,
       };
 
-      // Update optimistic views immediately
       setOptimisticViews((old) => [...old, optimisticView]);
       router.push(`/${baseId}/${tableId}/${tempId}`);
 
       return { previousViews, tempId };
     },
     onSuccess: (newView, variables, context) => {
-      // Update the temporary view with the real one
       setOptimisticViews((current) =>
         current.map((view) => (view.id === context?.tempId ? newView : view)),
       );
       router.push(`/${baseId}/${tableId}/${newView.id}`);
-      refetch(); // Add this to ensure we have the latest data
+      void refetch();
     },
     onError: (err, newView, context) => {
       if (context?.previousViews) {
@@ -111,7 +108,9 @@ const ViewSideBar = ({
                   ? "bg-[rgba(196,236,255,0.7)] text-black hover:bg-[rgba(196,236,255,0.9)]"
                   : "hover:bg-gray-200"
               }`}
-              onClick={() => router.push(`/${baseId}/${tableId}/${view.id}`)}
+              onClick={() => {
+                router.push(`/${baseId}/${tableId}/${view.id}`);
+              }}
             >
               <Grid2x2Plus
                 size={16}
