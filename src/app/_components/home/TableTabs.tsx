@@ -42,10 +42,9 @@ export function TableTabs({
   >({ baseId });
 
   const [isCreating, setIsCreating] = useState(false);
-  const [newTableName, setNewTableName] = useState("");
-  const [selectedTableId, setSelectedTableId] = useState<string>(tableId);
+  const [selectedTableId, setSelectedTableId] = useState<string>("");
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
-  const [selectedViewId, setSelectedViewId] = useState<string>(viewId);
+  const [selectedViewId, setSelectedViewId] = useState<string>("");
 
   const dropdownRef = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
@@ -77,6 +76,7 @@ export function TableTabs({
 
   const handleTableClick = (table: TableWithCount) => {
     setSelectedTableId(table.id);
+    localStorage.setItem(`selectedTable-${baseId}`, table.id);
     const targetViewId =
       table.id === tableId && viewId ? viewId : table.views[0]?.id;
 
@@ -86,16 +86,34 @@ export function TableTabs({
     }
   };
 
+  // Modify this effect to filter out temporary tables and handle cache cleanup
   useEffect(() => {
-    const cachedTableId = localStorage.getItem(`selectedTable-${baseId}`);
-    if (cachedTableId && tables.some((table) => table.id === cachedTableId)) {
-      setSelectedTableId(cachedTableId);
-    }
-  }, [baseId, tables]);
+    // Filter out any temporary tables from the displayed list
+    const validTables = tables.filter((table) => !table.id.startsWith("temp-"));
 
+    const cachedTableId = localStorage.getItem(`selectedTable-${baseId}`);
+
+    // Only use cached ID if it exists in the current valid tables list
+    if (
+      cachedTableId &&
+      validTables.some((table) => table.id === cachedTableId)
+    ) {
+      setSelectedTableId(cachedTableId);
+    } else if (validTables.length > 0) {
+      const defaultTableId = validTables.some((t) => t.id === tableId)
+        ? tableId
+        : (validTables[0]?.id ?? "");
+
+      setSelectedTableId(defaultTableId);
+      localStorage.setItem(`selectedTable-${baseId}`, defaultTableId);
+    }
+  }, [baseId, tables, tableId]);
+
+  // Combine the state initialization into a single useEffect
   useEffect(() => {
-    localStorage.setItem(`selectedTable-${baseId}`, selectedTableId);
-  }, [selectedTableId, baseId]);
+    setSelectedTableId(tableId);
+    setSelectedViewId(viewId);
+  }, [tableId, viewId]);
 
   if (isLoading) {
     return <TableTabsSkeleton />;
@@ -115,46 +133,48 @@ export function TableTabs({
             } bg-teal-500 [background:linear-gradient(rgba(0,0,0,0.1),rgba(0,0,0,0.1)),rgb(20,184,166)]`}
           ></div>
 
-          {tables.map((table, index) => (
-            <div
-              key={table.id}
-              onClick={() => handleTableClick(table)}
-              className={`-ml-[1px] h-full cursor-pointer bg-teal-500 [background:linear-gradient(rgba(0,0,0,0.1),rgba(0,0,0,0.1)),rgb(20,184,166)] ${
-                tables[index] && tables[index + 1]?.id === selectedTableId
-                  ? "rounded-br-sm"
-                  : tables[index] && tables[index - 1]?.id === selectedTableId
-                    ? "rounded-bl-sm"
-                    : ""
-              }`}
-            >
+          {tables
+            .filter((table) => !table.id.startsWith("temp-"))
+            .map((table, index) => (
               <div
-                className={`relative flex h-full items-center p-3 ${
-                  selectedTableId !== table.id ? "" : "rounded-t-sm bg-white"
+                key={table.id}
+                onClick={() => handleTableClick(table)}
+                className={`-ml-[1px] h-full cursor-pointer bg-teal-500 [background:linear-gradient(rgba(0,0,0,0.1),rgba(0,0,0,0.1)),rgb(20,184,166)] ${
+                  tables[index] && tables[index + 1]?.id === selectedTableId
+                    ? "rounded-br-sm"
+                    : tables[index] && tables[index - 1]?.id === selectedTableId
+                      ? "rounded-bl-sm"
+                      : ""
                 }`}
               >
-                <span
-                  className={`max-w-[200px] truncate text-[13px] font-medium ${
-                    selectedTableId !== table.id
-                      ? "text-white"
-                      : "text-gray-700"
+                <div
+                  className={`relative flex h-full items-center p-3 ${
+                    selectedTableId !== table.id ? "" : "rounded-t-sm bg-white"
                   }`}
                 >
-                  {table.name}
-                </span>
-                {selectedTableId === table.id && (
-                  <svg
-                    width="12"
-                    height="12"
-                    viewBox="0 0 16 16"
-                    className="ml-2 flex-shrink-0 fill-black"
-                    xmlns="http://www.w3.org/2000/svg"
+                  <span
+                    className={`max-w-[200px] truncate text-[13px] font-medium ${
+                      selectedTableId !== table.id
+                        ? "text-white"
+                        : "text-gray-700"
+                    }`}
                   >
-                    <path d="M4 6l4 4 4-4H4z" />
-                  </svg>
-                )}
+                    {table.name}
+                  </span>
+                  {selectedTableId === table.id && (
+                    <svg
+                      width="12"
+                      height="12"
+                      viewBox="0 0 16 16"
+                      className="ml-2 flex-shrink-0 fill-black"
+                      xmlns="http://www.w3.org/2000/svg"
+                    >
+                      <path d="M4 6l4 4 4-4H4z" />
+                    </svg>
+                  )}
+                </div>
               </div>
-            </div>
-          ))}
+            ))}
           <div
             tabIndex={0}
             role="button"
@@ -204,9 +224,9 @@ export function TableTabs({
               isOpen={isDropdownOpen}
               onClose={() => setIsDropdownOpen(false)}
               baseId={baseId}
-              onTableCreated={(tableId: string) => {
-                setSelectedTableId(tableId);
-                router.push(`/${baseId}/${tableId}`);
+              onTableCreated={(newTableId: string) => {
+                setSelectedTableId(newTableId);
+                localStorage.setItem(`selectedTable-${baseId}`, newTableId);
               }}
               setIsTableCreating={setIsCreating}
             />

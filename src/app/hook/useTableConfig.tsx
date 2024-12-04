@@ -2,24 +2,25 @@
 
 import { useMemo, useCallback } from "react";
 import { getCoreRowModel, type ColumnDef } from "@tanstack/react-table";
-import { type Row } from "../Types/types";
-import { type ColumnMeta } from "../Types/types"; // Ensure you have this type defined
+import {
+  type Row,
+  type ColumnType,
+  type UpdateCellParams,
+} from "../Types/types";
 
-interface TableConfigProps<T extends Row> {
-  rows: T[];
-  tableColumns: ColumnDef<T, unknown>[];
+interface TableConfigProps {
+  rows: Row[];
+  tableColumns: ColumnDef<Row, unknown>[];
   rowSelection: Record<string, boolean>;
   columnSizing: Record<string, number>;
   setColumnSizing: (sizing: Record<string, number>) => void;
   setRowSelection: (selection: Record<string, boolean>) => void;
-  updateCell: (params: {
-    id: string;
-    valueText?: string | null;
-    valueNumber?: number | null;
-  }) => void;
+  updateCell: {
+    mutate: (params: UpdateCellParams) => void;
+  };
 }
 
-export const useTableConfig = <T extends Row>({
+export const useTableConfig = ({
   rows,
   tableColumns,
   rowSelection,
@@ -27,7 +28,7 @@ export const useTableConfig = <T extends Row>({
   setColumnSizing,
   setRowSelection,
   updateCell,
-}: TableConfigProps<T>) => {
+}: TableConfigProps) => {
   // Handle column sizing changes
   const handleColumnSizingChange = useCallback(
     (
@@ -63,65 +64,24 @@ export const useTableConfig = <T extends Row>({
   // Handle updating cell data
   const handleUpdateData = useCallback(
     (rowIndex: number, columnId: string, value: unknown) => {
-      const row = rows[rowIndex];
-      if (!row) return;
-      const cell = row.cells.find((c) => c.columnId === columnId);
+      const cell = rows[rowIndex]?.cells.find((c) => c.columnId === columnId);
       if (!cell) return;
-      const columnDef = tableColumns.find((col) => col.id === columnId);
-      if (!columnDef) {
-        console.warn(`Column with ID "${columnId}" not found.`);
+
+      const column = tableColumns.find((col) => col.id === columnId);
+      const columnType = column?.meta?.type;
+
+      if (!columnType) {
+        console.error("Column type not found");
         return;
       }
 
-      // Extract column metadata (ensure you have `ColumnMeta` defined appropriately)
-      const columnMeta = columnDef.meta as ColumnMeta | undefined;
-      if (!columnMeta) {
-        console.warn(`Column metadata for "${columnId}" is undefined.`);
-        return;
-      }
+      const updateValue: UpdateCellParams = {
+        id: cell.id,
+        valueText: columnType === "Text" ? String(value) : null,
+        valueNumber: columnType === "Number" ? Number(value) : null,
+      };
 
-      const columnType = columnMeta.type;
-
-      // Prepare the update object based on column type
-      const updateObj: {
-        id: string;
-        valueText?: string | null;
-        valueNumber?: number | null;
-      } = { id: cell.id };
-
-      if (columnType === "Number") {
-        // Ensure the value is a number or null
-        const numberValue = value != null ? Number(value) : null;
-        updateObj.valueNumber = isNaN(numberValue!) ? null : numberValue!;
-        updateObj.valueText = null;
-      } else if (columnType === "Text") {
-        // Safely convert value to string, handling all possible types
-        const textValue =
-          value != null
-            ? typeof value === "string"
-              ? value
-              : typeof value === "number" ||
-                  typeof value === "boolean" ||
-                  typeof value === "bigint" ||
-                  typeof value === "symbol"
-                ? String(value)
-                : typeof value === "function"
-                  ? value.toString()
-                  : typeof value === "object"
-                    ? JSON.stringify(value, null, 2)
-                    : null // Handle any other unexpected types
-            : null;
-
-        updateObj.valueText = textValue;
-        updateObj.valueNumber = null;
-      } else {
-        // Handle other column types if any
-        console.warn(`Unsupported column type: ${String(columnType)}`);
-        return;
-      }
-
-      // Call the mutation to update the cell
-      updateCell(updateObj);
+      updateCell.mutate(updateValue);
     },
     [rows, tableColumns, updateCell],
   );

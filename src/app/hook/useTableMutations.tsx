@@ -4,6 +4,7 @@ import cuid from "cuid";
 import { type Row, type SimpleColumn } from "../Types/types";
 import { type ColumnType } from "@prisma/client";
 import { type SortCondition, type FilterCondition } from "../Types/types";
+import { type InfiniteData } from "@tanstack/react-query";
 
 // Helper function to convert sort conditions
 function mapSortConditionsToAPI(conditions: SortCondition[]) {
@@ -16,6 +17,12 @@ function mapSortConditionsToAPI(conditions: SortCondition[]) {
           ? "desc"
           : "asc",
   })) as { columnId: string; order: "asc" | "desc" }[];
+}
+
+interface UpdateCellParams {
+  id: string;
+  valueText?: string | null;
+  valueNumber?: number | null;
 }
 
 export function useTableMutations(
@@ -119,7 +126,11 @@ export function useTableMutations(
           filterConditions,
         },
         (oldData) => {
-          if (!oldData) return { pages: [], pageParams: [] };
+          if (!oldData)
+            return {
+              pages: [],
+              pageParams: [],
+            };
 
           const newPages = [...oldData.pages];
           if (newPages[0]) {
@@ -142,6 +153,7 @@ export function useTableMutations(
           return {
             ...oldData,
             pages: newPages,
+            pageParams: oldData.pageParams,
           };
         },
       );
@@ -177,11 +189,7 @@ export function useTableMutations(
   });
 
   const updateCell = api.cells.update.useMutation({
-    onMutate: async (newCell: {
-      id: string;
-      valueText?: string | null;
-      valueNumber?: number | null;
-    }) => {
+    onMutate: async (newCell: UpdateCellParams) => {
       await utils.rows.getByTableId.cancel({
         tableId,
         limit: 100,
@@ -207,35 +215,33 @@ export function useTableMutations(
           filterConditions,
         },
         (oldData) => {
-          if (!oldData) return oldData;
+          if (!oldData) return { pages: [], pageParams: [] };
+
+          const newPages = oldData.pages.map((page) => ({
+            ...page,
+            items: page.items.map((row) => ({
+              ...row,
+              cells: row.cells.map((cell) =>
+                cell.id === newCell.id
+                  ? {
+                      ...cell,
+                      valueText: newCell.valueText ?? null,
+                      valueNumber: newCell.valueNumber ?? null,
+                      createdAt: cell.createdAt,
+                      updatedAt: cell.updatedAt,
+                      column: cell.column,
+                      columnId: cell.columnId,
+                      rowId: cell.rowId,
+                      id: cell.id,
+                    }
+                  : cell,
+              ),
+            })),
+          }));
 
           return {
             ...oldData,
-            pages: oldData.pages.map((page) => ({
-              ...page,
-              items: page.items.map((row) => ({
-                ...row,
-                cells: row.cells.map((cell) =>
-                  cell.id === newCell.id
-                    ? {
-                        ...cell,
-                        valueText:
-                          newCell.valueNumber !== undefined
-                            ? null
-                            : newCell.valueText !== undefined
-                              ? newCell.valueText
-                              : cell.valueText,
-                        valueNumber:
-                          newCell.valueText !== undefined
-                            ? null
-                            : newCell.valueNumber !== undefined
-                              ? newCell.valueNumber
-                              : cell.valueNumber,
-                      }
-                    : cell,
-                ),
-              })),
-            })),
+            pages: newPages,
           };
         },
       );
@@ -243,6 +249,7 @@ export function useTableMutations(
       return { previousData };
     },
     onError: (err, newCell, context) => {
+      toast.error("Failed to update cell");
       if (context?.previousData) {
         utils.rows.getByTableId.setInfiniteData(
           {
@@ -255,7 +262,6 @@ export function useTableMutations(
           context.previousData,
         );
       }
-      toast.error("Failed to update cell");
     },
     onSettled: async () => {
       await utils.rows.getByTableId.invalidate({

@@ -111,7 +111,7 @@ export const DataTable = memo(
       columnSizing,
       setColumnSizing,
       setRowSelection,
-      updateCell: handleUpdateCell,
+      updateCell: { mutate: handleUpdateCell },
     });
 
     // Create table instance

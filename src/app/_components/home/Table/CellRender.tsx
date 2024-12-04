@@ -5,6 +5,7 @@ import { type ColumnType } from "@prisma/client";
 import { toast } from "sonner";
 import { type ColumnMeta } from "../../../Types/types";
 import { memo } from "react";
+
 interface CellRendererProps {
   info: CellContext<Row, string | number | null>;
   setEditing?: (editing: boolean) => void;
@@ -22,47 +23,47 @@ export const CellRenderer = memo(function CellRenderer({
   isHighlighted,
   searchQuery,
 }: CellRendererProps) {
-  const {
-    getValue,
-    row: { index },
-    column: { id },
-    table,
-  } = info;
-  const initialValue = getValue();
-  const [value, setValue] = useState(initialValue);
+  const [localValue, setLocalValue] = useState<string | number | null>(
+    info.getValue(),
+  );
   const [isEditing, setIsEditing] = useState(false);
 
-  const columnType = table.getColumn(id)?.columnDef.meta as ColumnMeta;
+  const columnType = info.table.getColumn(info.column.id)?.columnDef
+    .meta as ColumnMeta;
 
   useEffect(() => {
-    setValue(initialValue);
-  }, [initialValue]);
+    setLocalValue(info.getValue());
+  }, [info.getValue()]);
 
-  const onBlur = () => {
-    setIsEditing(false);
-    if (isValidValue(value, columnType.type)) {
-      table.options.meta?.updateData(index, id, value);
-    } else {
-      setValue(initialValue);
-    }
-  };
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newValue = e.target.value;
-
     if (columnType.type === "Number") {
       if (newValue === "") {
-        setValue(null);
+        setLocalValue(null);
       } else {
         const parsedNumber = Number(newValue);
         if (!isNaN(parsedNumber)) {
-          setValue(parsedNumber);
+          setLocalValue(parsedNumber);
         } else {
           toast.error("This column only accepts numbers");
         }
       }
     } else if (columnType.type === "Text") {
-      setValue(newValue);
+      setLocalValue(newValue);
     }
+  };
+
+  const onBlur = () => {
+    setIsEditing(false);
+    setEditing?.(false);
+
+    if (localValue === info.getValue()) return;
+
+    const valueToUpdate =
+      typeof localValue === "string" && localValue.trim() === ""
+        ? null
+        : localValue;
+    meta?.updateData(info.row.index, info.column.id, valueToUpdate);
   };
 
   const onFocus = () => {
@@ -73,7 +74,7 @@ export const CellRenderer = memo(function CellRenderer({
   if (isEditing) {
     return (
       <input
-        value={value ?? ""}
+        value={localValue ?? ""}
         onChange={handleChange}
         onBlur={onBlur}
         type={columnType?.type === "Number" ? "number" : "text"}
@@ -87,45 +88,34 @@ export const CellRenderer = memo(function CellRenderer({
       />
     );
   }
-
-  const cellValue = value?.toString() ?? "";
-  const highlightedText =
-    searchQuery && cellValue ? (
-      <span>
-        {cellValue.split(new RegExp(`(${searchQuery})`, "gi")).map((part, i) =>
-          part.toLowerCase() === searchQuery.toLowerCase() ? (
-            <span key={i} className="bg-yellow-200">
-              {part}
-            </span>
-          ) : (
-            part
-          ),
-        )}
-      </span>
-    ) : (
-      cellValue
-    );
-
+  const cellValue = localValue;
+  // const highlightedText =
+  //   searchQuery && cellValue ? (
+  //     <span>
+  //       {cellValue.split(new RegExp(`(${searchQuery})`, "gi")).map((part, i) =>
+  //         part.toLowerCase() === searchQuery.toLowerCase() ? (
+  //           <span key={i} className="bg-yellow-200">
+  //             {part}
+  //           </span>
+  //         ) : (
+  //           part
+  //         ),
+  //       )}
+  //     </span>
+  //   ) : (
+  //     cellValue
+  //   );
+  console.log("cell after value", cellValue);
   return (
     <div
       className={`flex h-full w-full cursor-text items-center px-2`}
-      onClick={() => onFocus()}
+      onClick={onFocus}
       onFocus={onFocus}
       tabIndex={0}
-      data-row-index={index}
-      data-column-index={table.getColumn(id)?.getIndex()}
+      data-row-index={info.row.index}
+      data-column-index={info.table.getColumn(info.column.id)?.getIndex()}
     >
-      {highlightedText}
+      {cellValue}
     </div>
   );
 });
-
-function isValidValue(
-  value: string | number | null,
-  columnType?: string,
-): boolean {
-  if (value === null) return true;
-  if (columnType === "Number") return typeof value === "number";
-  if (columnType === "Text") return typeof value === "string";
-  return false;
-}

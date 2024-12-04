@@ -62,4 +62,17 @@ declare module "@tanstack/react-table" {
   interface TableMeta<TData> {
     updateData: (rowIndex: number, cellId: string, value: unknown) => void;
   }
+
+  interface ColumnMeta<TData, TValue> {
+    type: ColumnType;
+    name: string;
+  }
+}
+
+export type { ColumnType } from "@prisma/client";
+
+export interface UpdateCellParams {
+  id: string;
+  valueText?: string | null;
+  valueNumber?: number | null;
 }

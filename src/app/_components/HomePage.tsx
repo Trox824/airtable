@@ -29,6 +29,7 @@ const HomePage: React.FC = () => {
   const [isOptimisticBase, setIsOptimisticBase] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [creatingBases, setCreatingBases] = useState<string[]>([]);
+  const [mounted, setMounted] = useState(false);
 
   const {
     isLoading: apiLoading,
@@ -37,12 +38,17 @@ const HomePage: React.FC = () => {
     refetch,
   } = api.base.getAll.useQuery();
   console.log(data);
+
   useEffect(() => {
-    if (data) {
+    setMounted(true);
+  }, []);
+
+  useEffect(() => {
+    if (mounted && data) {
       setLocalBases(data);
       setIsLoading(false);
     }
-  }, [data]);
+  }, [data, mounted]);
 
   useEffect(() => {
     const refetchTimer = setTimeout(() => {
@@ -199,6 +205,10 @@ const HomePage: React.FC = () => {
       ))}
     </>
   );
+
+  if (!mounted) {
+    return <LoadingSkeletons />;
+  }
 
   return (
     <div className="absolute h-full w-full overflow-hidden bg-[#F9FAFB]">

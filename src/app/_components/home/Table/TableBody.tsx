@@ -1,4 +1,4 @@
-import { useCallback, memo, useEffect } from "react";
+import { useCallback, memo, useEffect, useState } from "react";
 import {
   CellContext,
   type ColumnDef,
@@ -33,8 +33,16 @@ export const TableBody = memo(function TableBody({
   sortedColumns,
   filterConditions,
 }: TableBodyProps) {
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
   const renderCell = useCallback(
     (cell: Cell<Row, unknown>, value: unknown) => {
+      if (!mounted) return null;
+
       const cellContext = {
         ...cell,
         table,
@@ -50,23 +58,16 @@ export const TableBody = memo(function TableBody({
           </div>
         );
       }
-
-      const displayValue = value?.toString() ?? "";
-      const matches =
-        searchQuery &&
-        displayValue.toLowerCase().includes(searchQuery.toLowerCase());
-
       return (
         <MemoizedCellRenderer
           info={cellContext}
           setEditing={setEditing}
           meta={table.options.meta}
-          isHighlighted={!!matches}
           searchQuery={searchQuery}
         />
       );
     },
-    [searchQuery, setEditing, table.options.meta],
+    [searchQuery, setEditing, table.options.meta, mounted],
   );
 
   const virtualRows = virtualizer.getVirtualItems();
@@ -95,6 +96,18 @@ export const TableBody = memo(function TableBody({
     },
     [filterConditions],
   );
+
+  if (!mounted) {
+    return (
+      <tbody>
+        <tr>
+          <td colSpan={columns.length}>
+            <div className="h-8 animate-pulse bg-gray-100" />
+          </td>
+        </tr>
+      </tbody>
+    );
+  }
 
   return (
     <tbody>

@@ -19,7 +19,7 @@ export function useTableVirtualizer(
       if (!lastItem) return;
 
       if (
-        lastItem.index >= Math.floor(rowCount * 0.7) &&
+        lastItem.index >= Math.floor(rowCount * 0.65) &&
         hasNextPage &&
         !isFetchingNextPage
       ) {

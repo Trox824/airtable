@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { type ColumnType } from "@prisma/client";
 import { api } from "~/trpc/react";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import { v4 as uuidv4 } from "uuid";
 
 interface AddTableDropdownProps {
@@ -23,6 +23,7 @@ export function AddTableDropdown({
   setIsTableCreating,
 }: AddTableDropdownProps) {
   const router = useRouter();
+  const pathname = usePathname();
   const [dropdownPosition, setDropdownPosition] = useState<{
     top: number;
     left: number;
@@ -35,8 +36,8 @@ export function AddTableDropdown({
       setIsTableCreating(true);
       await utils.tables.getByBaseId.cancel({ baseId });
       const previousTables = utils.tables.getByBaseId.getData({ baseId });
-      const tempTableId = uuidv4();
-      const tempViewId = uuidv4();
+      const tempTableId = `temp-${uuidv4()}`;
+      const tempViewId = `temp-${uuidv4()}`;
       const tempTable = {
         id: tempTableId,
         name: newTable.name,
@@ -53,17 +54,35 @@ export function AddTableDropdown({
         tempTable,
       ]);
 
-      onTableCreated(tempTableId);
-
-      router.push(`/${baseId}/${tempTableId}/${tempViewId}`);
-
       return { previousTables, tempTableId, tempViewId };
     },
-    onSuccess: (result) => {
+    onSuccess: (result, variables, context) => {
       setIsTableCreating(false);
       onClose();
       if (result.id && result.views?.[0]?.id) {
-        router.replace(`/${baseId}/${result.id}/${result.views[0].id}`);
+        utils.tables.getByBaseId.setData({ baseId }, (old = []) =>
+          old
+            .filter((table) => !table.id.startsWith("temp-"))
+            .map((table) =>
+              table.id === context?.tempTableId
+                ? {
+                    id: result.id,
+                    name: result.name,
+                    baseId: result.baseId,
+                    views: result.views,
+                    _count: {
+                      columns: 2,
+                      rows: 2,
+                    },
+                  }
+                : table,
+            ),
+        );
+        onTableCreated(result.id);
+        localStorage.setItem(`selectedTable-${baseId}`, result.id);
+        router.push(`/${baseId}/${result.id}/${result.views[0].id}`, {
+          scroll: false,
+        });
       }
     },
     onError: (error, _, context) => {
@@ -81,8 +100,8 @@ export function AddTableDropdown({
       await utils.tables.getByBaseId.cancel({ baseId });
       const previousTables = utils.tables.getByBaseId.getData({ baseId });
 
-      const tempTableId = uuidv4();
-      const tempViewId = uuidv4();
+      const tempTableId = `temp-${uuidv4()}`;
+      const tempViewId = `temp-${uuidv4()}`;
       const tempTable = {
         id: tempTableId,
         name: newTable.name,
@@ -99,20 +118,36 @@ export function AddTableDropdown({
         tempTable,
       ]);
 
-      onTableCreated(tempTableId);
-
-      router.push(`/${baseId}/${tempTableId}/${tempViewId}`);
-
       return { previousTables, tempTableId, tempViewId };
     },
 
     onSuccess: (createdTable) => {
       setIsTableCreating(false);
+
+      utils.tables.getByBaseId.setData({ baseId }, (old = []) =>
+        old
+          .filter((table) => !table.id.startsWith("temp-"))
+          .concat({
+            id: createdTable.id,
+            name: createdTable.name,
+            baseId: createdTable.baseId,
+            views: createdTable.views,
+            _count: {
+              columns: 0,
+              rows: 0,
+            },
+          }),
+      );
+
       onTableCreated(createdTable.id);
       setTableName("");
       onClose();
-      router.replace(
+      localStorage.setItem(`selectedTable-${baseId}`, createdTable.id);
+      router.push(
         `/${baseId}/${createdTable.id}/${createdTable.views[0]?.id}`,
+        {
+          scroll: false,
+        },
       );
     },
 
