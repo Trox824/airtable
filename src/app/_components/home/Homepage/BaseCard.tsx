@@ -1,14 +1,21 @@
 import Link from "next/link";
 import React from "react";
-import { BaseCardProps } from "~/app/Types/homeTypes";
+import { BaseType } from "~/app/Types/types";
+interface BaseCardProps {
+  base: BaseType;
+  isOptimisticBase?: boolean;
+  isDeletingBase?: boolean;
+  onDelete: () => void;
+}
 
 export const BaseCard: React.FC<BaseCardProps> = ({
   base,
   isOptimisticBase,
+  isDeletingBase,
   onDelete,
 }) => {
   return (
-    <div className="group relative">
+    <div className={`relative ${isDeletingBase ? "opacity-50" : ""} group`}>
       <Link
         href={`/${base.id}/${base.tables?.[0]?.id}/${base.tables?.[0]?.views?.[0]?.id ?? ""}`}
       >
@@ -44,7 +51,7 @@ export const BaseCard: React.FC<BaseCardProps> = ({
           className="absolute right-0 top-1/2 mr-2 flex h-8 w-10 w-6 -translate-y-1/2 items-center justify-center rounded-md bg-black/5 opacity-0 transition-all duration-200 hover:bg-red-500 group-hover:opacity-100"
           onClick={(e) => {
             e.stopPropagation();
-            onDelete(base.id);
+            onDelete();
           }}
         >
           <svg
@@ -61,6 +68,11 @@ export const BaseCard: React.FC<BaseCardProps> = ({
             />
           </svg>
         </button>
+      )}
+      {isDeletingBase && (
+        <div className="absolute inset-0 flex items-center justify-center bg-white bg-opacity-50">
+          <div className="h-6 w-6 animate-spin rounded-full border-2 border-gray-300 border-t-blue-600" />
+        </div>
       )}
     </div>
   );

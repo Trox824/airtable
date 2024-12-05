@@ -9,11 +9,12 @@ import { ActionCards } from "./action-cards";
 
 const HomePage: React.FC = () => {
   const [mounted, setMounted] = useState(false);
+
   const {
     isOptimisticBase,
+    isDeletingBase,
     handleCreateBase,
-    deleteBase,
-    isCreatingBase,
+    handleDelete,
     pendingCreations,
   } = useBaseOperations();
 
@@ -45,18 +46,15 @@ const HomePage: React.FC = () => {
             Home
           </h1>
           <ActionCards />
-          <div className="my-10 border-t">
-            {/* Content can be added here if needed */}
-          </div>
+          <div className="my-10 border-t" />
           <BaseGrid
             bases={bases ?? []}
             isLoading={apiLoading}
-            isCreatingBase={isCreatingBase}
-            pendingCreations={pendingCreations}
             creatingBases={pendingCreations}
             isOptimisticBase={isOptimisticBase}
+            isDeletingBase={isDeletingBase}
             onCreateBase={handleCreateBase}
-            onDeleteBase={(baseId) => deleteBase({ id: baseId })}
+            onDeleteBase={(baseId) => handleDelete(baseId)}
           />
         </div>
       </div>

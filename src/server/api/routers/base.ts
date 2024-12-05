@@ -107,7 +107,7 @@ export const baseRouter = createTRPCRouter({
           };
         },
         {
-          timeout: 30000,
+          timeout: 300000,
         },
       );
     }),

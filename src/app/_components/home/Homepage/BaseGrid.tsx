@@ -5,7 +5,8 @@ import { BaseType } from "~/app/Types/types";
 export interface BaseGridProps {
   bases: BaseType[];
   isLoading: boolean;
-  isOptimisticBase: (baseId: string) => boolean; // Changed to a function
+  isOptimisticBase: (baseId: string) => boolean;
+  isDeletingBase: (baseId: string) => boolean;
   onCreateBase: (name: string) => Promise<void>;
   onDeleteBase: (baseId: string) => void;
   creatingBases: string[];
@@ -21,19 +22,14 @@ const LoadingSkeletonCard = () => (
     </div>
   </div>
 );
-export const BaseGrid: React.FC<
-  BaseGridProps & {
-    isCreatingBase: boolean;
-    pendingCreations: string[];
-  }
-> = ({
+export const BaseGrid: React.FC<BaseGridProps> = ({
   bases,
   isLoading,
-  pendingCreations,
   isOptimisticBase,
-  isCreatingBase,
+  isDeletingBase,
   onCreateBase,
   onDeleteBase,
+  creatingBases,
 }) => {
   return (
     <div className="grid w-full grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
@@ -48,13 +44,12 @@ export const BaseGrid: React.FC<
               key={base.id}
               base={base}
               isOptimisticBase={isOptimisticBase(base.id)}
-              onDelete={onDeleteBase}
+              isDeletingBase={isDeletingBase(base.id)}
+              onDelete={() => onDeleteBase(base.id)}
             />
           ))}
 
-          {pendingCreations.map((id) => (
-            <LoadingSkeletonCard key={id} />
-          ))}
+          {creatingBases.length > 0 && <LoadingSkeletonCard />}
 
           {!isLoading && (
             <div className="mt-1 h-24">
