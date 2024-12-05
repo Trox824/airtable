@@ -69,8 +69,6 @@ const HomePageNavbar: React.FC<NavbarProps> = ({ onLogout }) => {
                 placeholder="Search..."
                 className="placeholder-at-half-black/75 ml-2 text-[13px] outline-none"
                 type="text"
-                value=""
-                onChange={(e) => console.log(e.target.value)}
               />
             </div>
           </div>

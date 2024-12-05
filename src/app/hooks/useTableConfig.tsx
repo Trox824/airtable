@@ -14,6 +14,7 @@ interface TableConfigProps {
   updateCell: {
     mutate: (params: UpdateCellParams) => void;
   };
+  updateTempCell: (params: UpdateCellParams) => void;
 }
 
 export const useTableConfig = ({
@@ -24,6 +25,7 @@ export const useTableConfig = ({
   setColumnSizing,
   setRowSelection,
   updateCell,
+  updateTempCell,
 }: TableConfigProps) => {
   // Handle column sizing changes
   const handleColumnSizingChange = useCallback(
@@ -60,8 +62,17 @@ export const useTableConfig = ({
   // Handle updating cell data
   const handleUpdateData = useCallback(
     (rowIndex: number, columnId: string, value: unknown) => {
-      const cell = rows[rowIndex]?.cells.find((c) => c.columnId === columnId);
-      if (!cell) return;
+      const row = rows[rowIndex];
+      if (!row) {
+        console.error("Row not found", { rowIndex });
+        return;
+      }
+
+      const cell = row.cells.find((c) => c.columnId === columnId);
+      if (!cell) {
+        console.error("Cell not found", { rowIndex, columnId });
+        return;
+      }
 
       const column = tableColumns.find((col) => col.id === columnId);
       const columnType = column?.meta?.type;
@@ -71,15 +82,24 @@ export const useTableConfig = ({
         return;
       }
 
-      const updateValue: UpdateCellParams = {
+      const updateParams: UpdateCellParams = {
         id: cell.id,
-        valueText: columnType === "Text" ? String(value) : null,
-        valueNumber: columnType === "Number" ? Number(value) : null,
+        valueText: columnType === "Text" ? String(value ?? "") : null,
+        valueNumber:
+          columnType === "Number"
+            ? value === null || value === ""
+              ? null
+              : Number(value)
+            : null,
       };
 
-      updateCell.mutate(updateValue);
+      if (cell.id.startsWith("temp_")) {
+        updateTempCell(updateParams);
+      } else {
+        updateCell.mutate(updateParams);
+      }
     },
-    [rows, tableColumns, updateCell],
+    [rows, tableColumns, updateCell, updateTempCell],
   );
 
   return useMemo(

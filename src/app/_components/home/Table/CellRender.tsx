@@ -89,23 +89,26 @@ export const CellRenderer = memo(function CellRenderer({
     );
   }
   const cellValue = localValue;
-  // const highlightedText =
-  //   searchQuery && cellValue ? (
-  //     <span>
-  //       {cellValue.split(new RegExp(`(${searchQuery})`, "gi")).map((part, i) =>
-  //         part.toLowerCase() === searchQuery.toLowerCase() ? (
-  //           <span key={i} className="bg-yellow-200">
-  //             {part}
-  //           </span>
-  //         ) : (
-  //           part
-  //         ),
-  //       )}
-  //     </span>
-  //   ) : (
-  //     cellValue
-  //   );
-  console.log("cell after value", cellValue);
+  const highlightedText =
+    searchQuery && cellValue ? (
+      <span>
+        {cellValue
+          .toString()
+          .split(new RegExp(`(${searchQuery})`, "gi"))
+          .map((part, i) =>
+            part.toLowerCase() === searchQuery.toLowerCase() ? (
+              <span key={i} className="bg-yellow-200">
+                {part}
+              </span>
+            ) : (
+              part
+            ),
+          )}
+      </span>
+    ) : (
+      cellValue
+    );
+
   return (
     <div
       className={`flex h-full w-full cursor-text items-center px-2`}
@@ -115,7 +118,7 @@ export const CellRenderer = memo(function CellRenderer({
       data-row-index={info.row.index}
       data-column-index={info.table.getColumn(info.column.id)?.getIndex()}
     >
-      {cellValue}
+      {highlightedText}
     </div>
   );
 });

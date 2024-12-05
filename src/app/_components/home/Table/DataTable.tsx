@@ -58,6 +58,9 @@ export const DataTable = memo(
     );
     const [isEditing, setIsEditing] = useState(false);
     const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+    const [newRowCellValues, setNewRowCellValues] = useState<
+      Record<string, string | number | null>
+    >({});
 
     // Refs
     const tableContainerRef = useRef<HTMLDivElement>(null);
@@ -74,18 +77,23 @@ export const DataTable = memo(
     } = useTableQuery(tableId, searchQuery, sortConditions, filterConditions);
 
     // Mutations
-    const { addColumn, addRow, updateCell, renameColumn } = useTableMutations(
-      tableId,
-      searchQuery,
-      sortConditions,
-      filterConditions,
-      columns ?? [],
-      setIsTableCreating,
-    );
+    const { addColumn, addRow, updateCell, updateTempCell, renameColumn } =
+      useTableMutations(
+        tableId,
+        searchQuery,
+        sortConditions,
+        filterConditions,
+        columns ?? [],
+        setIsTableCreating,
+      );
 
     // Memoize handlers
     const handleUpdateCell = useCallback(
       (params: UpdateCellParams) => {
+        if (!params.id) {
+          console.error("Cell ID is required for updates");
+          return;
+        }
         updateCell.mutate(params);
       },
       [updateCell],
@@ -105,13 +113,14 @@ export const DataTable = memo(
 
     // Table configuration with memoized values
     const tableConfig = useTableConfig({
-      rows,
+      rows: rows as Row[],
       tableColumns: memoizedTableColumns as ColumnDef<Row>[],
       rowSelection,
       columnSizing,
       setColumnSizing,
       setRowSelection,
       updateCell: { mutate: handleUpdateCell },
+      updateTempCell,
     });
 
     // Create table instance
@@ -124,7 +133,25 @@ export const DataTable = memo(
     };
 
     const handleAddRow = () => {
-      addRow.mutate({ tableId });
+      const initialCellValues =
+        columns?.map((column) => ({
+          columnId: column.id,
+          valueText:
+            column.type === "Text"
+              ? ((newRowCellValues[column.id] as string) ?? "")
+              : null,
+          valueNumber:
+            column.type === "Number"
+              ? ((newRowCellValues[column.id] as number) ?? null)
+              : null,
+        })) ?? [];
+
+      addRow.mutate({
+        tableId,
+      });
+
+      // Reset new row cell values
+      setNewRowCellValues({});
     };
 
     const handleRenameColumn = (columnId: string, name: string) => {
@@ -142,6 +169,17 @@ export const DataTable = memo(
       hasNextPage,
       isFetchingNextPage,
       handleFetchNextPage,
+    );
+
+    // Add handler for new row cell changes
+    const handleNewRowCellChange = useCallback(
+      (columnId: string, value: string | number | null) => {
+        setNewRowCellValues((prevValues) => ({
+          ...prevValues,
+          [columnId]: value,
+        }));
+      },
+      [],
     );
 
     return (

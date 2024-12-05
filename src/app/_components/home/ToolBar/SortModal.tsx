@@ -39,7 +39,7 @@ export function SortModal({
   );
 
   const utils = api.useUtils();
-  console.log(sortConditions);
+
   const updateSort = api.view.updateSort.useMutation({
     onSuccess: () => {
       void utils.view.invalidate();

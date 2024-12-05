@@ -3,8 +3,13 @@ import { toast } from "react-hot-toast";
 import cuid from "cuid";
 import { type Row, type SimpleColumn } from "../Types/types";
 import { type ColumnType } from "@prisma/client";
-import { type SortCondition, type FilterCondition } from "../Types/types";
-import { type InfiniteData } from "@tanstack/react-query";
+import {
+  type SortCondition,
+  type FilterCondition,
+  UpdateCellParams,
+  Cell,
+  RowWithCells,
+} from "../Types/types";
 
 // Helper function to convert sort conditions
 function mapSortConditionsToAPI(conditions: SortCondition[]) {
@@ -17,12 +22,6 @@ function mapSortConditionsToAPI(conditions: SortCondition[]) {
           ? "desc"
           : "asc",
   })) as { columnId: string; order: "asc" | "desc" }[];
-}
-
-interface UpdateCellParams {
-  id: string;
-  valueText?: string | null;
-  valueNumber?: number | null;
 }
 
 export function useTableMutations(
@@ -97,25 +96,29 @@ export function useTableMutations(
         filterConditions,
       });
 
-      const id = cuid();
+      const id = `temp_${cuid()}`;
       const initialCells = columns.map((column: SimpleColumn) => ({
-        id: cuid(),
+        id: `temp_${cuid()}`,
         valueText: column.type === "Text" ? "" : null,
         valueNumber: column.type === "Number" ? 0 : null,
         column: {
           type: column.type,
+          id: column.id,
+          name: column.name,
         },
         columnId: column.id,
         rowId: id,
+        createdAt: new Date(),
+        updatedAt: new Date(),
       }));
 
-      const optimisticRow = {
+      const optimisticRow: Row = {
         id,
         tableId,
         cells: initialCells,
         createdAt: new Date(),
         updatedAt: new Date(),
-      } as Row;
+      };
 
       utils.rows.getByTableId.setInfiniteData(
         {
@@ -128,7 +131,7 @@ export function useTableMutations(
         (oldData) => {
           if (!oldData)
             return {
-              pages: [],
+              pages: [{ items: [optimisticRow], totalCount: 1 }],
               pageParams: [],
             };
 
@@ -158,7 +161,7 @@ export function useTableMutations(
         },
       );
 
-      return { previousData };
+      return { previousData, optimisticRow };
     },
     onError: (err, newRow, context) => {
       setIsTableCreating(false);
@@ -176,7 +179,47 @@ export function useTableMutations(
       }
       toast.error("Failed to add row");
     },
-    onSuccess: async (newRow) => {
+    onSuccess: async (newRow, variables, context) => {
+      const tempRowId = context?.optimisticRow?.id;
+
+      // Fetch the latest tempRow from the cache
+      const cachedData = utils.rows.getByTableId.getInfiniteData({
+        tableId,
+        limit: 100,
+        searchQuery,
+        sortConditions: mappedSortConditions,
+        filterConditions,
+      });
+
+      let tempRow: Row | undefined;
+      if (cachedData) {
+        for (const page of cachedData.pages) {
+          tempRow = page.items.find((row) => row.id === tempRowId);
+          if (tempRow) break;
+        }
+      }
+
+      // If we found a temp row, update each cell with its values
+      if (tempRow) {
+        const updatePromises = newRow.cells.map((newCell) => {
+          const tempCell = tempRow!.cells.find(
+            (cell) => cell.columnId === newCell.columnId,
+          );
+
+          if (tempCell) {
+            return updateCell.mutate({
+              id: newCell.id,
+              valueText: tempCell.valueText,
+              valueNumber: tempCell.valueNumber,
+            });
+          }
+        });
+
+        // Wait for all cell updates to complete
+        await Promise.all(updatePromises);
+      }
+
+      // Update the cache with the new row ID but preserve temp values
       utils.rows.getByTableId.setInfiniteData(
         {
           tableId,
@@ -186,50 +229,113 @@ export function useTableMutations(
           filterConditions,
         },
         (oldData) => {
-          if (!oldData) return { pages: [], pageParams: [] };
-
-          const newPages = oldData.pages.map((page) => ({
-            ...page,
-            items: page.items.map((row) =>
-              row.id === newRow.id ? newRow : row,
-            ),
-          }));
+          if (!oldData) return oldData;
 
           return {
             ...oldData,
-            pages: newPages,
+            pages: oldData.pages.map((page) => ({
+              ...page,
+              items: page.items.map((row) => {
+                if (row.id === tempRowId) {
+                  return {
+                    ...newRow,
+                    cells: newRow.cells.map((newCell) => {
+                      const tempCell = tempRow?.cells.find(
+                        (cell) => cell.columnId === newCell.columnId,
+                      );
+                      return {
+                        ...newCell,
+                        valueText: tempCell?.valueText ?? newCell.valueText,
+                        valueNumber:
+                          tempCell?.valueNumber ?? newCell.valueNumber,
+                      };
+                    }),
+                  };
+                }
+                return row;
+              }),
+            })),
           };
         },
       );
+
+      setIsTableCreating(false);
+    },
+
+    onSettled: () => {
       setIsTableCreating(false);
     },
   });
 
   const updateCell = api.cells.update.useMutation({
     onMutate: async (newCell: UpdateCellParams) => {
-      // Cancel any outgoing refetches
-      await utils.rows.getByTableId.cancel({
-        tableId,
-        limit: 100,
-        searchQuery,
-        sortConditions: mappedSortConditions,
-        filterConditions,
-      });
+      if (!newCell.id.startsWith("temp_")) {
+        await utils.rows.getByTableId.cancel({
+          tableId,
+          limit: 100,
+          searchQuery,
+          sortConditions: mappedSortConditions,
+          filterConditions,
+        });
 
-      // Snapshot the previous value
-      const previousData = utils.rows.getByTableId.getInfiniteData({
-        tableId,
-        limit: 100,
-        searchQuery,
-        sortConditions: mappedSortConditions,
-        filterConditions,
-      });
+        const previousData = utils.rows.getByTableId.getInfiniteData({
+          tableId,
+          limit: 100,
+          searchQuery,
+          sortConditions: mappedSortConditions,
+          filterConditions,
+        });
 
-      return { previousData };
+        // Optimistically update the cell value
+        utils.rows.getByTableId.setInfiniteData(
+          {
+            tableId,
+            limit: 100,
+            searchQuery,
+            sortConditions: mappedSortConditions,
+            filterConditions,
+          },
+          (oldData) => {
+            if (!oldData) return oldData;
+
+            return {
+              ...oldData,
+              pages: oldData.pages.map((page) => ({
+                ...page,
+                items: page.items.map((row) => ({
+                  ...row,
+                  cells: row.cells.map((cell) =>
+                    cell.id === newCell.id
+                      ? {
+                          ...cell,
+                          valueText: newCell.valueText ?? cell.valueText,
+                          valueNumber: newCell.valueNumber ?? cell.valueNumber,
+                        }
+                      : cell,
+                  ),
+                })),
+              })),
+            };
+          },
+        );
+
+        return { previousData };
+      }
+      // For temporary cells, do not proceed with server mutation
+      return {};
     },
-
     onError: (err, newCell, context) => {
-      if (context?.previousData) {
+      console.error("updateCell error:", {
+        error: err,
+        cellId: newCell.id,
+        values: {
+          text: newCell.valueText,
+          number: newCell.valueNumber,
+        },
+      });
+
+      // Only revert if it's a real cell
+      if (!newCell.id.startsWith("temp_") && context?.previousData) {
         utils.rows.getByTableId.setInfiniteData(
           {
             tableId,
@@ -240,14 +346,82 @@ export function useTableMutations(
           },
           context.previousData,
         );
+        toast.error("Failed to update cell");
       }
-      toast.error("Failed to update cell");
+      // If "Cell not found", likely a temp cell; do not revert
     },
+    onSuccess: (result, variables) => {
+      // Update the cache with the new cell value
+      utils.rows.getByTableId.setInfiniteData(
+        {
+          tableId,
+          limit: 100,
+          searchQuery,
+          sortConditions: mappedSortConditions,
+          filterConditions,
+        },
+        (oldData) => {
+          if (!oldData) return oldData;
 
-    onSuccess: (updatedCell) => {
-      // No need to invalidate or refetch, the optimistic update handles the UI
+          return {
+            ...oldData,
+            pages: oldData.pages.map((page) => ({
+              ...page,
+              items: page.items.map((row) => ({
+                ...row,
+                cells: row.cells.map((cell) =>
+                  cell.id === variables.id
+                    ? {
+                        ...cell,
+                        valueText: variables.valueText ?? cell.valueText,
+                        valueNumber: variables.valueNumber ?? cell.valueNumber,
+                      }
+                    : cell,
+                ),
+              })),
+            })),
+          };
+        },
+      );
+    },
+    onSettled: async () => {
+      await utils.rows.getByTableId.invalidate({ tableId });
     },
   });
+
+  const updateTempCell = (newCell: UpdateCellParams) => {
+    utils.rows.getByTableId.setInfiniteData(
+      {
+        tableId,
+        limit: 100,
+        searchQuery,
+        sortConditions: mappedSortConditions,
+        filterConditions,
+      },
+      (oldData) => {
+        if (!oldData) return oldData;
+
+        return {
+          ...oldData,
+          pages: oldData.pages.map((page) => ({
+            ...page,
+            items: page.items.map((row) => ({
+              ...row,
+              cells: row.cells.map((cell) =>
+                cell.id === newCell.id
+                  ? {
+                      ...cell,
+                      valueText: newCell.valueText ?? cell.valueText,
+                      valueNumber: newCell.valueNumber ?? cell.valueNumber,
+                    }
+                  : cell,
+              ),
+            })),
+          })),
+        };
+      },
+    );
+  };
 
   const renameColumn = api.columns.rename.useMutation({
     onMutate: async (newColumn: { columnId: string; name: string }) => {
@@ -281,6 +455,7 @@ export function useTableMutations(
     addColumn,
     addRow,
     updateCell,
+    updateTempCell,
     renameColumn,
   };
 }
