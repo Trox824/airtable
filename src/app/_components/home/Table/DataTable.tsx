@@ -12,11 +12,11 @@ import {
   type FilterCondition,
   type SortCondition,
 } from "../../../Types/types";
-import { useTableQuery } from "~/app/hook/useTableQuery";
-import { useTableMutations } from "~/app/hook/useTableMutations";
-import { useTableColumns } from "~/app/hook/useTableColumns";
-import { useTableVirtualizer } from "~/app/hook/useTableVirtualizer";
-import { useTableConfig } from "~/app/hook/useTableConfig";
+import { useTableQuery } from "~/app/hooks/useTableQuery";
+import { useTableMutations } from "~/app/hooks/useTableMutations";
+import { useTableColumns } from "~/app/hooks/useTableColumns";
+import { useTableVirtualizer } from "~/app/hooks/useTableVirtualizer";
+import { useTableConfig } from "~/app/hooks/useTableConfig";
 import { type Row } from "../../../Types/types";
 
 interface UpdateCellParams {

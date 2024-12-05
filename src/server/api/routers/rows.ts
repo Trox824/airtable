@@ -62,41 +62,46 @@ const buildFilterCondition = ({
   }
 };
 
-export const rowsRouter = createTRPCRouter({
-  // Create a new row
-  create: publicProcedure
-    .input(
+// Define input type for better type safety
+const createRowInput = z.object({
+  tableId: z.string(),
+  sortConditions: z
+    .array(
       z.object({
-        tableId: z.string(),
-        sortConditions: z
-          .array(
-            z.object({
-              columnId: z.string(),
-              order: z.enum(["asc", "desc"]),
-            }),
-          )
-          .optional(),
+        columnId: z.string(),
+        order: z.enum(["asc", "desc"]),
       }),
     )
+    .optional(),
+});
+
+export const rowsRouter = createTRPCRouter({
+  create: publicProcedure
+    .input(createRowInput)
     .mutation(async ({ ctx, input }): Promise<RowWithCells> => {
-      const table = await ctx.db.table.findUnique({
-        where: { id: input.tableId },
-        include: { columns: true },
-      });
-
-      if (!table) {
-        throw new TRPCError({ code: "NOT_FOUND", message: "Table not found" });
-      }
-
-      if (table.columns.length === 0) {
-        throw new TRPCError({
-          code: "BAD_REQUEST",
-          message: "Table has no columns",
-        });
-      }
-
-      const row = await ctx.db.$transaction(
+      return await ctx.db.$transaction(
         async (tx) => {
+          // 1. Get table with columns first
+          const table = await tx.table.findUnique({
+            where: { id: input.tableId },
+            include: { columns: true },
+          });
+
+          if (!table) {
+            throw new TRPCError({
+              code: "NOT_FOUND",
+              message: "Table not found",
+            });
+          }
+
+          if (table.columns.length === 0) {
+            throw new TRPCError({
+              code: "BAD_REQUEST",
+              message: "Table has no columns",
+            });
+          }
+
+          // 2. Create row with cells in one transaction
           const createdRow = await tx.row.create({
             data: {
               tableId: input.tableId,
@@ -104,20 +109,33 @@ export const rowsRouter = createTRPCRouter({
                 create: table.columns.map((column) => ({
                   columnId: column.id,
                   valueText: column.type === ColumnType.Text ? "" : null,
-                  valueNumber: null,
+                  valueNumber: column.type === ColumnType.Number ? 0 : null,
                 })),
               },
             },
             include: {
-              cells: { include: { column: { select: { type: true } } } },
+              cells: {
+                include: {
+                  column: {
+                    select: { type: true },
+                  },
+                },
+              },
             },
           });
 
+          // 3. If sort conditions exist, fetch the row again with proper sorting
           if (input.sortConditions?.length) {
             const sortedRow = await tx.row.findUnique({
               where: { id: createdRow.id },
               include: {
-                cells: { include: { column: { select: { type: true } } } },
+                cells: {
+                  include: {
+                    column: {
+                      select: { type: true },
+                    },
+                  },
+                },
               },
             });
 
@@ -134,11 +152,9 @@ export const rowsRouter = createTRPCRouter({
           return createdRow;
         },
         {
-          timeout: 20000, // Increased timeout to 10 seconds
+          timeout: 10000, // 10 second timeout
         },
       );
-
-      return row;
     }),
 
   // Get total count of rows in a table

@@ -76,3 +76,16 @@ export interface UpdateCellParams {
   valueText?: string | null;
   valueNumber?: number | null;
 }
+
+export type BaseType = {
+  id: string;
+  name: string;
+  tables: {
+    id: string;
+    name: string;
+    views: {
+      id: string;
+      name: string;
+    }[];
+  }[];
+};

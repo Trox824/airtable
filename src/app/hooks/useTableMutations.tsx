@@ -98,10 +98,10 @@ export function useTableMutations(
       });
 
       const id = cuid();
-      const emptyCells = columns.map((column: SimpleColumn) => ({
+      const initialCells = columns.map((column: SimpleColumn) => ({
         id: cuid(),
         valueText: column.type === "Text" ? "" : null,
-        valueNumber: null,
+        valueNumber: column.type === "Number" ? 0 : null,
         column: {
           type: column.type,
         },
@@ -112,7 +112,7 @@ export function useTableMutations(
       const optimisticRow = {
         id,
         tableId,
-        cells: emptyCells,
+        cells: initialCells,
         createdAt: new Date(),
         updatedAt: new Date(),
       } as Row;
@@ -176,36 +176,7 @@ export function useTableMutations(
       }
       toast.error("Failed to add row");
     },
-    onSettled: async () => {
-      setIsTableCreating(false);
-      await utils.rows.getByTableId.invalidate({
-        tableId,
-        limit: 100,
-        searchQuery,
-        sortConditions: mappedSortConditions,
-        filterConditions,
-      });
-    },
-  });
-
-  const updateCell = api.cells.update.useMutation({
-    onMutate: async (newCell: UpdateCellParams) => {
-      await utils.rows.getByTableId.cancel({
-        tableId,
-        limit: 100,
-        searchQuery,
-        sortConditions: mappedSortConditions,
-        filterConditions,
-      });
-
-      const previousData = utils.rows.getByTableId.getInfiniteData({
-        tableId,
-        limit: 100,
-        searchQuery,
-        sortConditions: mappedSortConditions,
-        filterConditions,
-      });
-
+    onSuccess: async (newRow) => {
       utils.rows.getByTableId.setInfiniteData(
         {
           tableId,
@@ -219,24 +190,9 @@ export function useTableMutations(
 
           const newPages = oldData.pages.map((page) => ({
             ...page,
-            items: page.items.map((row) => ({
-              ...row,
-              cells: row.cells.map((cell) =>
-                cell.id === newCell.id
-                  ? {
-                      ...cell,
-                      valueText: newCell.valueText ?? null,
-                      valueNumber: newCell.valueNumber ?? null,
-                      createdAt: cell.createdAt,
-                      updatedAt: cell.updatedAt,
-                      column: cell.column,
-                      columnId: cell.columnId,
-                      rowId: cell.rowId,
-                      id: cell.id,
-                    }
-                  : cell,
-              ),
-            })),
+            items: page.items.map((row) =>
+              row.id === newRow.id ? newRow : row,
+            ),
           }));
 
           return {
@@ -245,11 +201,34 @@ export function useTableMutations(
           };
         },
       );
+      setIsTableCreating(false);
+    },
+  });
+
+  const updateCell = api.cells.update.useMutation({
+    onMutate: async (newCell: UpdateCellParams) => {
+      // Cancel any outgoing refetches
+      await utils.rows.getByTableId.cancel({
+        tableId,
+        limit: 100,
+        searchQuery,
+        sortConditions: mappedSortConditions,
+        filterConditions,
+      });
+
+      // Snapshot the previous value
+      const previousData = utils.rows.getByTableId.getInfiniteData({
+        tableId,
+        limit: 100,
+        searchQuery,
+        sortConditions: mappedSortConditions,
+        filterConditions,
+      });
 
       return { previousData };
     },
+
     onError: (err, newCell, context) => {
-      toast.error("Failed to update cell");
       if (context?.previousData) {
         utils.rows.getByTableId.setInfiniteData(
           {
@@ -262,15 +241,11 @@ export function useTableMutations(
           context.previousData,
         );
       }
+      toast.error("Failed to update cell");
     },
-    onSettled: async () => {
-      await utils.rows.getByTableId.invalidate({
-        tableId,
-        limit: 100,
-        searchQuery,
-        sortConditions: mappedSortConditions,
-        filterConditions,
-      });
+
+    onSuccess: (updatedCell) => {
+      // No need to invalidate or refetch, the optimistic update handles the UI
     },
   });
 

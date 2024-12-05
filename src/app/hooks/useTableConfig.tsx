@@ -2,11 +2,7 @@
 
 import { useMemo, useCallback } from "react";
 import { getCoreRowModel, type ColumnDef } from "@tanstack/react-table";
-import {
-  type Row,
-  type ColumnType,
-  type UpdateCellParams,
-} from "../Types/types";
+import { type Row, type UpdateCellParams } from "../Types/types";
 
 interface TableConfigProps {
   rows: Row[];

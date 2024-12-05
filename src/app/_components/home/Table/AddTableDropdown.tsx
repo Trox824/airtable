@@ -10,8 +10,9 @@ interface AddTableDropdownProps {
   isOpen: boolean;
   onClose: () => void;
   baseId: string;
-  onTableCreated: (tableId: string) => void;
-  setIsTableCreating: (isTableCreating: boolean) => void;
+  createTable: (data: { name: string; baseId: string }) => void;
+  createWithFakeData: (data: { name: string; baseId: string }) => void;
+  isCreatingWithFakeData: boolean;
 }
 export function AddTableDropdown({
   dropdownRef,
@@ -19,8 +20,9 @@ export function AddTableDropdown({
   isOpen,
   onClose,
   baseId,
-  onTableCreated,
-  setIsTableCreating,
+  createTable,
+  createWithFakeData,
+  isCreatingWithFakeData,
 }: AddTableDropdownProps) {
   const router = useRouter();
   const pathname = usePathname();
@@ -29,135 +31,6 @@ export function AddTableDropdown({
     left: number;
   }>({ top: 0, left: 0 });
   const [tableName, setTableName] = useState("");
-  const utils = api.useUtils();
-
-  const createWithFakeData = api.tables.createWithDefaults.useMutation({
-    onMutate: async (newTable) => {
-      setIsTableCreating(true);
-      await utils.tables.getByBaseId.cancel({ baseId });
-      const previousTables = utils.tables.getByBaseId.getData({ baseId });
-      const tempTableId = `temp-${uuidv4()}`;
-      const tempViewId = `temp-${uuidv4()}`;
-      const tempTable = {
-        id: tempTableId,
-        name: newTable.name,
-        baseId: newTable.baseId,
-        views: [{ id: tempViewId, name: "Grid view" }],
-        _count: {
-          columns: 0,
-          rows: 0,
-        },
-      };
-
-      utils.tables.getByBaseId.setData({ baseId }, (old = []) => [
-        ...old,
-        tempTable,
-      ]);
-
-      return { previousTables, tempTableId, tempViewId };
-    },
-    onSuccess: (result, variables, context) => {
-      setIsTableCreating(false);
-      onClose();
-      if (result.id && result.views?.[0]?.id) {
-        utils.tables.getByBaseId.setData({ baseId }, (old = []) =>
-          old
-            .filter((table) => !table.id.startsWith("temp-"))
-            .map((table) =>
-              table.id === context?.tempTableId
-                ? {
-                    id: result.id,
-                    name: result.name,
-                    baseId: result.baseId,
-                    views: result.views,
-                    _count: {
-                      columns: 2,
-                      rows: 2,
-                    },
-                  }
-                : table,
-            ),
-        );
-        onTableCreated(result.id);
-        localStorage.setItem(`selectedTable-${baseId}`, result.id);
-        router.push(`/${baseId}/${result.id}/${result.views[0].id}`, {
-          scroll: false,
-        });
-      }
-    },
-    onError: (error, _, context) => {
-      setIsTableCreating(false);
-      if (context?.previousTables) {
-        utils.tables.getByBaseId.setData({ baseId }, context.previousTables);
-      }
-      alert(`Error creating table with fake data: ${error.message}`);
-    },
-  });
-
-  const createTableMutation = api.tables.create.useMutation({
-    onMutate: async (newTable) => {
-      setIsTableCreating(true);
-      await utils.tables.getByBaseId.cancel({ baseId });
-      const previousTables = utils.tables.getByBaseId.getData({ baseId });
-
-      const tempTableId = `temp-${uuidv4()}`;
-      const tempViewId = `temp-${uuidv4()}`;
-      const tempTable = {
-        id: tempTableId,
-        name: newTable.name,
-        baseId: newTable.baseId,
-        views: [{ id: tempViewId, name: "Grid view" }],
-        _count: {
-          columns: 0,
-          rows: 0,
-        },
-      };
-
-      utils.tables.getByBaseId.setData({ baseId }, (old = []) => [
-        ...old,
-        tempTable,
-      ]);
-
-      return { previousTables, tempTableId, tempViewId };
-    },
-
-    onSuccess: (createdTable) => {
-      setIsTableCreating(false);
-
-      utils.tables.getByBaseId.setData({ baseId }, (old = []) =>
-        old
-          .filter((table) => !table.id.startsWith("temp-"))
-          .concat({
-            id: createdTable.id,
-            name: createdTable.name,
-            baseId: createdTable.baseId,
-            views: createdTable.views,
-            _count: {
-              columns: 0,
-              rows: 0,
-            },
-          }),
-      );
-
-      onTableCreated(createdTable.id);
-      setTableName("");
-      onClose();
-      localStorage.setItem(`selectedTable-${baseId}`, createdTable.id);
-      router.push(
-        `/${baseId}/${createdTable.id}/${createdTable.views[0]?.id}`,
-        {
-          scroll: false,
-        },
-      );
-    },
-
-    onError: (_, __, context) => {
-      setIsTableCreating(false);
-      if (context?.previousTables) {
-        utils.tables.getByBaseId.setData({ baseId }, context.previousTables);
-      }
-    },
-  });
 
   useEffect(() => {
     if (!isOpen || !buttonRef.current || !dropdownRef.current) return;
@@ -185,28 +58,23 @@ export function AddTableDropdown({
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (tableName.trim()) {
-      createTableMutation.mutate({
+      createTable({
         name: tableName.trim(),
         baseId: baseId,
       });
     }
   };
 
-  const handleAddFakeData = async () => {
+  const handleAddFakeData = () => {
     if (!tableName.trim()) {
       alert("Please enter a table name first");
       return;
     }
 
-    try {
-      createWithFakeData.mutate({
-        name: tableName.trim(),
-        baseId: baseId,
-      });
-    } catch (error) {
-      console.error("Error creating table with fake data:", error);
-      alert("Failed to create table with fake data");
-    }
+    createWithFakeData({
+      name: tableName.trim(),
+      baseId: baseId,
+    });
   };
 
   return (
@@ -242,10 +110,10 @@ export function AddTableDropdown({
             <button
               type="button"
               onClick={handleAddFakeData}
-              disabled={!tableName.trim() || createWithFakeData.isPending}
+              disabled={!tableName.trim() || isCreatingWithFakeData}
               className="cursor-pointer rounded-sm p-2 pl-4 text-left text-sm font-normal text-gray-700 hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50"
             >
-              {createWithFakeData.isPending ? "Creating..." : "Add Sample Data"}
+              {isCreatingWithFakeData ? "Creating..." : "Add Sample Data"}
             </button>
           </div>
         </form>

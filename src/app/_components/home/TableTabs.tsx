@@ -51,6 +51,163 @@ export function TableTabs({
 
   const utils = api.useUtils();
 
+  const createWithFakeData = api.tables.createWithDefaults.useMutation({
+    onMutate: async (newTable) => {
+      setIsTableCreating(true);
+      await utils.tables.getByBaseId.cancel({ baseId });
+      const previousTables = utils.tables.getByBaseId.getData({ baseId });
+      const tempTableId = `temp-${uuidv4()}`;
+      const tempViewId = `temp-${uuidv4()}`;
+      const tempTable = {
+        id: tempTableId,
+        name: newTable.name,
+        baseId: newTable.baseId,
+        views: [{ id: tempViewId, name: "Grid view" }],
+        _count: {
+          columns: 0,
+          rows: 0,
+        },
+      };
+
+      utils.tables.getByBaseId.setData({ baseId }, (old = []) => [
+        ...old,
+        tempTable,
+      ]);
+      return { previousTables, tempTableId, tempViewId };
+    },
+    onSuccess: (result, variables, context) => {
+      setIsTableCreating(false);
+      setIsDropdownOpen(false);
+      if (result.id && result.views?.[0]?.id) {
+        utils.tables.getByBaseId.setData({ baseId }, (old = []) =>
+          old
+            .filter((table) => !table.id.startsWith("temp-"))
+            .map((table) =>
+              table.id === context?.tempTableId
+                ? {
+                    id: result.id,
+                    name: result.name,
+                    baseId: result.baseId,
+                    views: result.views,
+                    _count: {
+                      columns: 2,
+                      rows: 2,
+                    },
+                  }
+                : table,
+            ),
+        );
+        setSelectedTableId(result.id);
+        localStorage.setItem(`selectedTable-${baseId}`, result.id);
+        router.push(`/${baseId}/${result.id}/${result.views[0].id}`, {
+          scroll: false,
+        });
+      }
+    },
+    onError: (error, _, context) => {
+      setIsTableCreating(false);
+      if (context?.previousTables) {
+        utils.tables.getByBaseId.setData({ baseId }, context.previousTables);
+      }
+      alert(`Error creating table with fake data: ${error.message}`);
+    },
+  });
+
+  const createTableMutation = api.tables.create.useMutation({
+    onMutate: async (newTable) => {
+      setIsTableCreating(true);
+
+      // Cancel any outgoing refetches
+      await utils.tables.getByBaseId.cancel({ baseId });
+      await utils.columns.getByTableId.cancel();
+
+      // Snapshot the previous value
+      const previousTables = utils.tables.getByBaseId.getData({ baseId });
+
+      // Create temporary IDs
+      const tempTableId = `temp-${uuidv4()}`;
+      const tempViewId = `temp-${uuidv4()}`;
+
+      // Create an optimistic table with a default view
+      const optimisticTable: TableWithCount = {
+        id: tempTableId,
+        name: newTable.name,
+        baseId: newTable.baseId,
+        views: [{ id: tempViewId, name: "Grid view" }],
+        _count: {
+          columns: 0,
+          rows: 0,
+        },
+      };
+
+      // Optimistically update the tables list
+      utils.tables.getByBaseId.setData({ baseId }, (old = []) => [
+        ...(old ?? []),
+        optimisticTable,
+      ]);
+
+      // Set empty columns for the temp table
+      utils.columns.getByTableId.setData({ tableId: tempTableId }, []);
+
+      // Update UI state immediately
+      setSelectedTableId(tempTableId);
+      setIsDropdownOpen(false);
+      localStorage.setItem(`selectedTable-${baseId}`, tempTableId);
+
+      // Navigate to the new table
+      router.push(`/${baseId}/${tempTableId}/${tempViewId}`, { scroll: false });
+
+      return { previousTables, tempTableId, tempViewId };
+    },
+
+    onSuccess: (createdTable, _, context) => {
+      if (!context) return;
+
+      // Update with real data while preserving the optimistic UI
+      utils.tables.getByBaseId.setData({ baseId }, (old = []) =>
+        (old ?? [])
+          .filter((table) => table.id !== context.tempTableId)
+          .concat({
+            id: createdTable.id,
+            name: createdTable.name,
+            baseId: createdTable.baseId,
+            views: createdTable.views,
+            _count: {
+              columns: 0,
+              rows: 0,
+            },
+          }),
+      );
+
+      // Update URL with real IDs
+      setSelectedTableId(createdTable.id);
+      localStorage.setItem(`selectedTable-${baseId}`, createdTable.id);
+      router.replace(
+        `/${baseId}/${createdTable.id}/${createdTable.views[0]?.id}`,
+        {
+          scroll: false,
+        },
+      );
+
+      // Keep loading state until data is ready
+      setTimeout(() => {
+        setIsTableCreating(false);
+      }, 500);
+    },
+
+    onError: (_, __, context) => {
+      if (context?.previousTables) {
+        utils.tables.getByBaseId.setData({ baseId }, context.previousTables);
+        utils.columns.getByTableId.setData(
+          { tableId: context.tempTableId },
+          undefined,
+        );
+      }
+      setIsTableCreating(false);
+      alert("Failed to create table. Please try again.");
+    },
+  });
+
   // New useEffect to handle clicks outside the dropdown
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -122,7 +279,6 @@ export function TableTabs({
   return (
     <div className="fixed left-0 right-0 top-navbar z-40 h-8 bg-teal-500 text-white">
       <div className="flex h-8 flex-row justify-between">
-        {/* Left side content */}
         <div className="flex w-full flex-row items-center overflow-scroll rounded-tr-lg bg-white [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           {/* Active tab indicator */}
           <div
@@ -133,48 +289,47 @@ export function TableTabs({
             } bg-teal-500 [background:linear-gradient(rgba(0,0,0,0.1),rgba(0,0,0,0.1)),rgb(20,184,166)]`}
           ></div>
 
-          {tables
-            .filter((table) => !table.id.startsWith("temp-"))
-            .map((table, index) => (
+          {tables.map((table, index) => (
+            <div
+              key={table.id}
+              onClick={() => handleTableClick(table)}
+              className={`-ml-[1px] h-full cursor-pointer bg-teal-500 [background:linear-gradient(rgba(0,0,0,0.1),rgba(0,0,0,0.1)),rgb(20,184,166)] ${
+                tables[index] && tables[index + 1]?.id === selectedTableId
+                  ? "rounded-br-sm"
+                  : tables[index] && tables[index - 1]?.id === selectedTableId
+                    ? "rounded-bl-sm"
+                    : ""
+              }`}
+            >
               <div
-                key={table.id}
-                onClick={() => handleTableClick(table)}
-                className={`-ml-[1px] h-full cursor-pointer bg-teal-500 [background:linear-gradient(rgba(0,0,0,0.1),rgba(0,0,0,0.1)),rgb(20,184,166)] ${
-                  tables[index] && tables[index + 1]?.id === selectedTableId
-                    ? "rounded-br-sm"
-                    : tables[index] && tables[index - 1]?.id === selectedTableId
-                      ? "rounded-bl-sm"
-                      : ""
+                className={`relative flex h-full items-center p-3 ${
+                  selectedTableId !== table.id ? "" : "rounded-t-sm bg-white"
                 }`}
               >
-                <div
-                  className={`relative flex h-full items-center p-3 ${
-                    selectedTableId !== table.id ? "" : "rounded-t-sm bg-white"
+                <span
+                  className={`max-w-[200px] truncate text-[13px] font-medium ${
+                    selectedTableId !== table.id
+                      ? "text-white"
+                      : "text-gray-700"
                   }`}
                 >
-                  <span
-                    className={`max-w-[200px] truncate text-[13px] font-medium ${
-                      selectedTableId !== table.id
-                        ? "text-white"
-                        : "text-gray-700"
-                    }`}
+                  {table.name}
+                  {table.id.startsWith("temp-") && ""}
+                </span>
+                {selectedTableId === table.id && (
+                  <svg
+                    width="12"
+                    height="12"
+                    viewBox="0 0 16 16"
+                    className="ml-2 flex-shrink-0 fill-black"
+                    xmlns="http://www.w3.org/2000/svg"
                   >
-                    {table.name}
-                  </span>
-                  {selectedTableId === table.id && (
-                    <svg
-                      width="12"
-                      height="12"
-                      viewBox="0 0 16 16"
-                      className="ml-2 flex-shrink-0 fill-black"
-                      xmlns="http://www.w3.org/2000/svg"
-                    >
-                      <path d="M4 6l4 4 4-4H4z" />
-                    </svg>
-                  )}
-                </div>
+                    <path d="M4 6l4 4 4-4H4z" />
+                  </svg>
+                )}
               </div>
-            ))}
+            </div>
+          ))}
           <div
             tabIndex={0}
             role="button"
@@ -224,11 +379,9 @@ export function TableTabs({
               isOpen={isDropdownOpen}
               onClose={() => setIsDropdownOpen(false)}
               baseId={baseId}
-              onTableCreated={(newTableId: string) => {
-                setSelectedTableId(newTableId);
-                localStorage.setItem(`selectedTable-${baseId}`, newTableId);
-              }}
-              setIsTableCreating={setIsCreating}
+              createTable={createTableMutation.mutate}
+              createWithFakeData={createWithFakeData.mutate}
+              isCreatingWithFakeData={createWithFakeData.isPending}
             />
           )}
           <div className="h-full flex-grow rounded-tr-lg bg-teal-500 [background:linear-gradient(rgba(0,0,0,0.1),rgba(0,0,0,0.1)),rgb(20,184,166)]"></div>
