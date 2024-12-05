@@ -84,7 +84,18 @@ export const useTableConfig = ({
 
       const updateParams: UpdateCellParams = {
         id: cell.id,
-        valueText: columnType === "Text" ? String(value ?? "") : null,
+        valueText:
+          columnType === "Text"
+            ? value === null || value === undefined
+              ? ""
+              : typeof value === "object"
+                ? JSON.stringify(value, null, 2)
+                : typeof value === "string"
+                  ? value
+                  : typeof value === "number" || typeof value === "boolean"
+                    ? value.toString()
+                    : ""
+            : null,
         valueNumber:
           columnType === "Number"
             ? value === null || value === ""

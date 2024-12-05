@@ -202,7 +202,7 @@ export function useTableMutations(
       // If we found a temp row, update each cell with its values
       if (tempRow) {
         const updatePromises = newRow.cells.map((newCell) => {
-          const tempCell = tempRow!.cells.find(
+          const tempCell = tempRow.cells.find(
             (cell) => cell.columnId === newCell.columnId,
           );
 
