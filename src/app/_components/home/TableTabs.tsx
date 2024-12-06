@@ -72,6 +72,10 @@ export function TableTabs({
         ...old,
         tempTable,
       ]);
+
+      // Immediately navigate to the temporary table
+      router.push(`/${baseId}/${tempTableId}/${tempViewId}`, { scroll: false });
+
       return { previousTables, tempTableId, tempViewId };
     },
     onSuccess: (result, variables, context) => {
