@@ -53,11 +53,19 @@ export function TableTabs({
   const createWithFakeData = api.tables.createWithDefaults.useMutation({
     onMutate: async (newTable) => {
       setIsTableCreating(true);
+
+      // Cancel outgoing refetches
       await utils.tables.getByBaseId.cancel({ baseId });
+      await utils.columns.getByTableId.cancel();
+
       const previousTables = utils.tables.getByBaseId.getData({ baseId });
+
+      // Create temporary IDs
       const tempTableId = `temp-${uuidv4()}`;
       const tempViewId = `temp-${uuidv4()}`;
-      const tempTable = {
+
+      // Create optimistic table
+      const optimisticTable: TableWithCount = {
         id: tempTableId,
         name: newTable.name,
         baseId: newTable.baseId,
@@ -68,50 +76,67 @@ export function TableTabs({
         },
       };
 
+      // Update tables list optimistically
       utils.tables.getByBaseId.setData({ baseId }, (old = []) => [
-        ...old,
-        tempTable,
+        ...(old ?? []),
+        optimisticTable,
       ]);
 
-      // Immediately navigate to the temporary table
+      // Set empty columns for temp table
+      utils.columns.getByTableId.setData({ tableId: tempTableId }, []);
+
+      // Update UI state
+      setSelectedTableId(tempTableId);
+      setIsDropdownOpen(false);
+      localStorage.setItem(`selectedTable-${baseId}`, tempTableId);
+
+      // Navigate to temp table
       router.push(`/${baseId}/${tempTableId}/${tempViewId}`, { scroll: false });
 
       return { previousTables, tempTableId, tempViewId };
     },
-    onSuccess: (result, variables, context) => {
-      setIsTableCreating(false);
-      setIsDropdownOpen(false);
-      if (result.id && result.views?.[0]?.id) {
-        utils.tables.getByBaseId.setData({ baseId }, (old = []) =>
-          old
-            .filter((table) => !table.id.startsWith("temp-"))
-            .map((table) =>
-              table.id === context?.tempTableId
-                ? {
-                    id: result.id,
-                    name: result.name,
-                    baseId: result.baseId,
-                    views: result.views,
-                    _count: {
-                      columns: 2,
-                      rows: 2,
-                    },
-                  }
-                : table,
-            ),
-        );
-        setSelectedTableId(result.id);
-        localStorage.setItem(`selectedTable-${baseId}`, result.id);
-        router.push(`/${baseId}/${result.id}/${result.views[0].id}`, {
-          scroll: false,
-        });
-      }
+
+    onSuccess: (result, _, context) => {
+      if (!context) return;
+
+      // Update with real data
+      utils.tables.getByBaseId.setData({ baseId }, (old = []) =>
+        (old ?? [])
+          .filter((table) => table.id !== context.tempTableId)
+          .concat({
+            id: result.id,
+            name: result.name,
+            baseId: result.baseId,
+            views: result.views,
+            _count: {
+              columns: 2,
+              rows: 2,
+            },
+          }),
+      );
+
+      // Update URL with real IDs
+      setSelectedTableId(result.id);
+      localStorage.setItem(`selectedTable-${baseId}`, result.id);
+      router.replace(`/${baseId}/${result.id}/${result.views[0]?.id}`, {
+        scroll: false,
+      });
+
+      // Delay setting isTableCreating to false
+      setTimeout(() => {
+        setIsTableCreating(false);
+      }, 500);
     },
+
     onError: (error, _, context) => {
-      setIsTableCreating(false);
       if (context?.previousTables) {
         utils.tables.getByBaseId.setData({ baseId }, context.previousTables);
+        utils.columns.getByTableId.setData(
+          { tableId: context.tempTableId },
+          undefined,
+        );
       }
+      setIsTableCreating(false);
       alert(`Error creating table with fake data: ${error.message}`);
     },
   });
