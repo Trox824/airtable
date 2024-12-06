@@ -41,7 +41,6 @@ export function TableTabs({
     TableWithCount[]
   >({ baseId });
 
-  const [isCreating, setIsCreating] = useState(false);
   const [selectedTableId, setSelectedTableId] = useState<string>("");
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [selectedViewId, setSelectedViewId] = useState<string>("");
@@ -247,9 +246,7 @@ export function TableTabs({
   useEffect(() => {
     // Filter out any temporary tables from the displayed list
     const validTables = tables.filter((table) => !table.id.startsWith("temp-"));
-
     const cachedTableId = localStorage.getItem(`selectedTable-${baseId}`);
-
     // Only use cached ID if it exists in the current valid tables list
     if (
       cachedTableId &&

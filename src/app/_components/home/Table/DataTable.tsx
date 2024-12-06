@@ -170,18 +170,6 @@ export const DataTable = memo(
       isFetchingNextPage,
       handleFetchNextPage,
     );
-
-    // Add handler for new row cell changes
-    const handleNewRowCellChange = useCallback(
-      (columnId: string, value: string | number | null) => {
-        setNewRowCellValues((prevValues) => ({
-          ...prevValues,
-          [columnId]: value,
-        }));
-      },
-      [],
-    );
-
     return (
       <>
         <div className="flex h-[calc(100vh-theme(spacing.navbar)-4.5rem-theme(spacing.toolbar))] flex-1 flex-col bg-[#f8f8f8]">

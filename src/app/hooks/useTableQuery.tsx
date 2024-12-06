@@ -3,7 +3,6 @@ import { type SortCondition, type FilterCondition } from "../Types/types";
 import { useMemo, useCallback } from "react";
 import { type Prisma, type FilterOperator } from "@prisma/client";
 import { type UseInfiniteQueryOptions } from "@tanstack/react-query";
-import { type TRPCClientErrorLike } from "@trpc/client";
 
 type RowWithCells = Prisma.RowGetPayload<{
   include: {
@@ -19,19 +18,6 @@ type PaginatedResponse = {
   items: RowWithCells[];
   nextCursor?: string;
   totalCount: number;
-};
-
-type RouterInput = {
-  tableId: string;
-  cursor?: string;
-  sortConditions?: { columnId: string; order: "asc" | "desc" }[];
-  limit?: number;
-  searchQuery?: string;
-  filterConditions?: {
-    columnId: string;
-    operator: FilterOperator;
-    value: string | null;
-  }[];
 };
 
 export function useTableQuery(

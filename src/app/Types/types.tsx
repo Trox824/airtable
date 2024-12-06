@@ -60,6 +60,7 @@ export interface Cell {
   updatedAt: Date;
 }
 export type RowWithCells = {
+  id: string;
   cells: Cell[];
 };
 

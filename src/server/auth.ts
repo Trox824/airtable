@@ -5,7 +5,6 @@ import {
   type DefaultSession,
   type NextAuthOptions,
 } from "next-auth";
-import CredentialsProvider from "next-auth/providers/credentials";
 import GoogleProvider from "next-auth/providers/google";
 import { db } from "./db";
 
@@ -32,7 +31,6 @@ export const authOptions: NextAuthOptions = {
       }
       return token;
     },
-    // Remove custom redirect and signIn callbacks
   },
   adapter: PrismaAdapter(db),
   providers: [
@@ -43,7 +41,7 @@ export const authOptions: NextAuthOptions = {
   ],
   pages: {
     signIn: "/login",
-    error: "/auth/error", // Redirect to a custom error page
+    error: "/auth/error",
   },
   session: {
     strategy: "jwt",

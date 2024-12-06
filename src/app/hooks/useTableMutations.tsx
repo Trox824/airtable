@@ -10,6 +10,7 @@ import {
   Cell,
   RowWithCells,
 } from "../Types/types";
+import { useCallback } from "react";
 
 // Helper function to convert sort conditions
 function mapSortConditionsToAPI(conditions: SortCondition[]) {
@@ -36,31 +37,85 @@ export function useTableMutations(
   const mappedSortConditions = mapSortConditionsToAPI(sortConditions);
 
   const addColumn = api.columns.create.useMutation({
-    onMutate: async (newColumn: {
-      tableId: string;
-      name: string;
-      type: ColumnType;
-    }) => {
+    onMutate: async (newColumn) => {
       setIsTableCreating(true);
+      // Cancel ongoing queries
       await utils.columns.getByTableId.cancel({ tableId });
+      // Snapshot the previous columns
       const previousColumns = utils.columns.getByTableId.getData({ tableId });
-      const id = cuid();
-      const optimisticColumn = {
-        id,
-        tableId: newColumn.tableId,
-        name: newColumn.name,
-        type: newColumn.type,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      };
-
+      // Create a temporary column ID
+      const tempColumnId = `temp_${cuid()}`;
+      // Optimistically update the columns data
       utils.columns.getByTableId.setData({ tableId }, (oldColumns) => [
         ...(oldColumns ?? []),
-        optimisticColumn,
+        {
+          id: tempColumnId,
+          name: newColumn.name,
+          type: newColumn.type,
+        },
       ]);
 
-      return { previousColumns };
+      // Prepare and set optimistic updates for rows
+      await utils.rows.getByTableId.cancel({
+        tableId,
+        limit: 100,
+        searchQuery,
+        sortConditions: mappedSortConditions,
+        filterConditions,
+      });
+
+      const existingRows = utils.rows.getByTableId.getInfiniteData({
+        tableId,
+        limit: 100,
+        searchQuery,
+        sortConditions: mappedSortConditions,
+        filterConditions,
+      });
+
+      // For each existing row, add an empty cell for the new temp column
+      if (existingRows) {
+        const updatedPages = existingRows.pages.map((page) => ({
+          ...page,
+          items: page.items.map((row) => {
+            const tempCell: Cell = {
+              id: `temp_${cuid()}`,
+              valueText: newColumn.type === "Text" ? "" : null,
+              valueNumber: newColumn.type === "Number" ? null : null,
+              columnId: tempColumnId,
+              rowId: row.id,
+              column: {
+                id: tempColumnId,
+                name: newColumn.name,
+                type: newColumn.type,
+              },
+              createdAt: new Date(),
+              updatedAt: new Date(),
+            };
+            return { ...row, cells: [...row.cells, tempCell] };
+          }),
+        }));
+
+        utils.rows.getByTableId.setInfiniteData(
+          {
+            tableId,
+            limit: 100,
+            searchQuery,
+            sortConditions: mappedSortConditions,
+            filterConditions,
+          },
+          (oldData) =>
+            oldData
+              ? {
+                  ...oldData,
+                  pages: updatedPages,
+                }
+              : oldData,
+        );
+      }
+
+      return { previousColumns, tempColumnId };
     },
+
     onError: (err, newColumn, context) => {
       setIsTableCreating(false);
       if (context?.previousColumns) {
@@ -69,7 +124,61 @@ export function useTableMutations(
           context.previousColumns,
         );
       }
+      toast.error("Failed to add column");
     },
+
+    onSuccess: async (newColumn) => {
+      // 1. Find the temporary column ID from the cache
+      const cachedData = utils.rows.getByTableId.getInfiniteData({
+        tableId,
+        limit: 100,
+        searchQuery,
+        sortConditions: mappedSortConditions,
+        filterConditions,
+      });
+
+      // 2. Find all temp cells for the new column and update their real counterparts
+      if (cachedData) {
+        const updatePromises: Promise<Cell>[] = [];
+
+        cachedData.pages.forEach((page) => {
+          page.items.forEach((row) => {
+            // Find temp cell and real cell by matching column type and checking temp prefix
+            const tempCell = row.cells.find(
+              (cell) =>
+                cell.columnId.startsWith("temp_") &&
+                cell.column.type === newColumn.type,
+            );
+            const realCell = row.cells.find(
+              (cell) => cell.columnId === newColumn.id,
+            );
+
+            // Only update if temp cell has a value
+            if (
+              tempCell &&
+              realCell &&
+              (tempCell.valueText !== null || tempCell.valueNumber !== null)
+            ) {
+              updatePromises.push(
+                updateCell.mutateAsync({
+                  id: realCell.id,
+                  valueText: tempCell.valueText,
+                  valueNumber: tempCell.valueNumber,
+                }),
+              );
+            }
+          });
+        });
+
+        // Wait for all updates to complete
+        await Promise.all(updatePromises);
+      }
+
+      setIsTableCreating(false);
+      await utils.columns.getByTableId.invalidate({ tableId });
+      await utils.rows.getByTableId.invalidate({ tableId });
+    },
+
     onSettled: async () => {
       setIsTableCreating(false);
       await utils.columns.getByTableId.invalidate({ tableId });
@@ -100,7 +209,7 @@ export function useTableMutations(
       const initialCells = columns.map((column: SimpleColumn) => ({
         id: `temp_${cuid()}`,
         valueText: column.type === "Text" ? "" : null,
-        valueNumber: column.type === "Number" ? 0 : null,
+        valueNumber: column.type === "Number" ? null : null,
         column: {
           type: column.type,
           id: column.id,
