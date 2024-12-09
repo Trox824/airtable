@@ -201,9 +201,9 @@ export const rowsRouter = createTRPCRouter({
         filterConditions,
       } = input;
       const params: (string | number)[] = [tableId];
-      let paramIndex = 2; // Starting from $2 since $1 is tableId
+      let paramIndex = 2; // $1 is tableId
 
-      // Start building the WHERE clause
+      // Base WHERE clause
       let whereClause = `WHERE r."tableId" = $1`;
 
       // Handle filter conditions
@@ -213,40 +213,37 @@ export const rowsRouter = createTRPCRouter({
           const cAlias = `c_filter${index}`;
           params.push(columnId);
           let condition = "";
-          let paramsAdded = 1; // We have added columnId
+          let paramsAdded = 1; // We added columnId
 
           switch (operator) {
             case FilterOperator.Contains:
               params.push(`%${value ?? ""}%`);
               condition = `${cAlias}."columnId" = $${paramIndex} AND ${cAlias}."valueText" ILIKE $${paramIndex + 1}`;
-              paramsAdded += 1;
+              paramsAdded++;
               break;
             case FilterOperator.Equals:
               params.push(value ?? "");
               condition = `${cAlias}."columnId" = $${paramIndex} AND (${cAlias}."valueText" = $${paramIndex + 1} OR ${cAlias}."valueNumber" = $${paramIndex + 1}::float)`;
-              paramsAdded += 1;
+              paramsAdded++;
               break;
             case FilterOperator.GreaterThan:
               params.push(parseNumber(value ?? undefined) ?? 0);
               condition = `${cAlias}."columnId" = $${paramIndex} AND ${cAlias}."valueNumber" > $${paramIndex + 1}`;
-              paramsAdded += 1;
+              paramsAdded++;
               break;
             case FilterOperator.SmallerThan:
               params.push(parseNumber(value ?? undefined) ?? 0);
               condition = `${cAlias}."columnId" = $${paramIndex} AND ${cAlias}."valueNumber" < $${paramIndex + 1}`;
-              paramsAdded += 1;
+              paramsAdded++;
               break;
             case FilterOperator.IsEmpty:
               condition = `${cAlias}."columnId" = $${paramIndex} AND ${cAlias}."valueText" = '' AND ${cAlias}."valueNumber" IS NULL`;
-              // paramsAdded remains 1
               break;
             case FilterOperator.IsNotEmpty:
               condition = `${cAlias}."columnId" = $${paramIndex} AND (${cAlias}."valueText" != '' OR ${cAlias}."valueNumber" IS NOT NULL)`;
-              // paramsAdded remains 1
               break;
             default:
               condition = "TRUE";
-            // paramsAdded remains 1
           }
 
           whereClause += ` AND EXISTS (
@@ -258,19 +255,27 @@ export const rowsRouter = createTRPCRouter({
         });
       }
 
-      // Handle search query (optional)
+      // Handle search query
       if (searchQuery) {
         params.push(`%${searchQuery}%`);
         const cAlias = `c_search`;
         whereClause += ` AND EXISTS (
         SELECT 1 FROM "Cell" ${cAlias}
-        WHERE ${cAlias}."rowId" = r.id AND (${cAlias}."valueText" ILIKE $${paramIndex} OR CAST(${cAlias}."valueNumber" AS TEXT) ILIKE $${paramIndex})
+        WHERE ${cAlias}."rowId" = r.id 
+          AND (${cAlias}."valueText" ILIKE $${paramIndex} 
+            OR CAST(${cAlias}."valueNumber" AS TEXT) ILIKE $${paramIndex})
       )`;
-        paramIndex += 1;
+        paramIndex++;
       }
 
-      // Start building the ORDER BY clause
-      let orderByClause = "";
+      // Handle cursor for pagination: simplify by directly using r.id > cursor
+      if (cursor) {
+        params.push(cursor);
+        whereClause += ` AND r.id > $${paramIndex}`;
+        paramIndex++;
+      }
+
+      // Handle sorting
       const joinClauses: string[] = [];
       const orderByConditions: string[] = [];
 
@@ -289,108 +294,54 @@ export const rowsRouter = createTRPCRouter({
             ELSE COALESCE(${sortAlias}."valueText", '')
           END ${sort.order.toUpperCase()}
         `);
-          paramIndex += 1;
+          paramIndex++;
         });
-      }
-
-      // Default ordering if no sort conditions provided
-      if (orderByConditions.length === 0) {
+      } else {
+        // Default ordering by r.id if no sort given
         orderByConditions.push(`r.id ASC`);
       }
 
-      orderByClause = `ORDER BY ${orderByConditions.join(", ")}`;
+      const orderByClause = `ORDER BY ${orderByConditions.join(", ")}`;
 
-      // Handle cursor for pagination (UPDATED)
-      if (cursor) {
-        params.push(cursor);
-        // Changed from > to >= to include the cursor row
-        whereClause += ` AND (
-          CASE 
-            WHEN r.id = $${paramIndex} THEN false 
-            WHEN r.id > $${paramIndex} THEN true
-            ELSE false 
-          END
-        )`;
-        paramIndex += 1;
-      }
+      // Increase limit by one to detect next page
+      const fetchLimit = limit + 1;
+      params.push(fetchLimit);
+      const limitParam = paramIndex++;
 
-      // Build the SQL query
       const sql = `
       SELECT 
         r.id,
         r."tableId",
-        r."createdAt",
-        r."updatedAt",
         COALESCE(json_agg(
           json_build_object(
             'id', c.id,
             'valueText', c."valueText",
             'valueNumber', c."valueNumber",
             'columnId', c."columnId",
-            'column', json_build_object('type', col.type),
-            'rowId', c."rowId",
-            'createdAt', c."createdAt",
-            'updatedAt', c."updatedAt"
-          ) 
-          ORDER BY c."columnId"
+            'rowId', c."rowId"
+          )
         ) FILTER (WHERE c.id IS NOT NULL), '[]') AS cells
-        ${
-          sortConditions?.length
-            ? `,
-            ${sortConditions
-              .map(
-                (_, index) => `
-              MAX(CASE 
-                WHEN s${index}."valueNumber" IS NOT NULL 
-                THEN CAST(s${index}."valueNumber" AS TEXT)
-                ELSE COALESCE(s${index}."valueText", '')
-              END) as sort_value_${index}
-            `,
-              )
-              .join(", ")}
-        `
-            : ""
-        }
       FROM "Row" r
       LEFT JOIN "Cell" c ON c."rowId" = r.id
-      LEFT JOIN "Column" col ON c."columnId" = col.id
       ${joinClauses.join(" ")}
       ${whereClause}
-      GROUP BY r.id, r."tableId", r."createdAt", r."updatedAt"
-      ${
-        sortConditions?.length
-          ? `ORDER BY ${sortConditions
-              .map(
-                (sort, index) =>
-                  `sort_value_${index} ${sort.order.toUpperCase()}`,
-              )
-              .join(", ")}`
-          : "ORDER BY r.id ASC"
-      }
-      LIMIT $${paramIndex}::integer
+      GROUP BY r.id, r."tableId"
+      ${orderByClause}
+      LIMIT $${limitParam}::integer
     `;
 
-      // Modify the LIMIT clause to fetch one extra row (UPDATED)
-      const fetchLimit = limit + 1;
-      params.push(fetchLimit);
-
       try {
-        // Execute the query with the correct number of parameters
         const rows: (Row & { cells: PrismaCell[] })[] =
           await ctx.db.$queryRawUnsafe(sql, ...params);
 
-        // Determine if there's a next page (UPDATED)
         let nextCursor: string | undefined;
         if (rows.length > limit) {
-          // Remove the extra row we fetched
           const nextItem = rows.pop()!;
           nextCursor = nextItem.id;
         }
 
-        // Get total count (optional, can be optimized)
         const totalCount = await ctx.db.row.count({ where: { tableId } });
 
-        // Map rows to include cells with column type
         const items: RowWithCells[] = rows.map((row) => ({
           ...row,
           cells: (row.cells || []).map((cell) => ({
