@@ -1,6 +1,6 @@
 // src/app/_components/home/Table/DataTable.tsx
 "use client";
-import { useState, useRef, memo, useCallback, useMemo } from "react";
+import { useState, useRef, memo, useCallback, useMemo, useEffect } from "react";
 import { TableLoadingState } from "./TableLoading";
 import { TableHeader } from "./TableHeader";
 import { TableBody } from "./TableBody";
@@ -18,7 +18,7 @@ import { useTableColumns } from "~/app/hooks/useTableColumns";
 import { useTableVirtualizer } from "~/app/hooks/useTableVirtualizer";
 import { useTableConfig } from "~/app/hooks/useTableConfig";
 import { type Row } from "../../../Types/types";
-
+import { api } from "~/trpc/react";
 interface UpdateCellParams {
   id: string;
   valueText?: string | null;
@@ -35,6 +35,22 @@ interface DataTableProps {
   isTableCreating: boolean;
   setIsTableCreating: (isCreating: boolean) => void;
 }
+
+// Create a new hook
+const useTotalRowCount = (tableId: string, shouldRefetch: boolean) => {
+  const { data: totalRowCount, refetch } = api.rows.totalCount.useQuery(
+    { tableId },
+    { enabled: true },
+  );
+
+  useEffect(() => {
+    if (shouldRefetch) {
+      void refetch();
+    }
+  }, [shouldRefetch, refetch]);
+
+  return totalRowCount;
+};
 
 export const DataTable = memo(
   ({
@@ -56,13 +72,12 @@ export const DataTable = memo(
     );
     const [isEditing, setIsEditing] = useState(false);
     const [isDropdownOpen, setIsDropdownOpen] = useState(false);
-    const [newRowCellValues, setNewRowCellValues] = useState<
-      Record<string, string | number | null>
-    >({});
+    const [shouldRefetchCount, setShouldRefetchCount] = useState(false);
+
+    const totalRowCount = useTotalRowCount(tableId, shouldRefetchCount);
 
     // Refs
     const tableContainerRef = useRef<HTMLDivElement>(null);
-    const dropdownRef = useRef<HTMLDivElement>(null);
     const buttonRef = useRef<HTMLButtonElement>(null);
 
     // Query data
@@ -130,27 +145,12 @@ export const DataTable = memo(
       setIsDropdownOpen(false);
     };
 
-    const handleAddRow = () => {
-      const initialCellValues =
-        columns?.map((column) => ({
-          columnId: column.id,
-          valueText:
-            column.type === "Text"
-              ? ((newRowCellValues[column.id] as string) ?? "")
-              : null,
-          valueNumber:
-            column.type === "Number"
-              ? ((newRowCellValues[column.id] as number) ?? null)
-              : null,
-        })) ?? [];
-
+    const handleAddRow = useCallback(() => {
       addRow.mutate({
         tableId,
       });
-
-      // Reset new row cell values
-      setNewRowCellValues({});
-    };
+      setShouldRefetchCount(true);
+    }, [addRow, tableId]);
 
     const handleRenameColumn = (columnId: string, name: string) => {
       renameColumn.mutate({ columnId, name });
@@ -160,9 +160,17 @@ export const DataTable = memo(
       void fetchNextPage();
     }, [fetchNextPage]);
 
+    // Reset the refetch flag after the mutation completes
+    useEffect(() => {
+      if (shouldRefetchCount && !addRow.isPending) {
+        setShouldRefetchCount(false);
+      }
+    }, [shouldRefetchCount, addRow.isPending]);
+
     // Add virtualizer
     const virtualizer = useTableVirtualizer(
       tableContainerRef,
+      totalRowCount ?? 0,
       rows.length,
       hasNextPage,
       isFetchingNextPage,
@@ -185,7 +193,6 @@ export const DataTable = memo(
                       table={table}
                       isDropdownOpen={isDropdownOpen}
                       buttonRef={buttonRef}
-                      dropdownRef={dropdownRef}
                       onCreateColumn={handleCreateColumn}
                       onRenameColumn={handleRenameColumn}
                       setIsDropdownOpen={setIsDropdownOpen}

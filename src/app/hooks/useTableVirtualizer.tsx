@@ -4,6 +4,7 @@ import { useCallback, type RefObject } from "react";
 export function useTableVirtualizer(
   containerRef: RefObject<HTMLDivElement>,
   rowCount: number,
+  currentRow: number,
   hasNextPage: boolean,
   isFetchingNextPage: boolean,
   fetchNextPage: () => void,
@@ -14,12 +15,14 @@ export function useTableVirtualizer(
     estimateSize: useCallback(() => 32, []),
     overscan: 20,
     onChange: (instance) => {
-      const virtualItems = instance.getVirtualItems();
-      const lastItem = virtualItems[virtualItems.length - 1];
-      if (!lastItem) return;
+      // Get the last visible item
+      const lastItem = instance.getVirtualItems().at(-1);
 
+      if (!lastItem) return;
+      console.log(lastItem.index);
+      console.log(currentRow);
       if (
-        lastItem.index >= Math.floor(rowCount * 0.65) &&
+        lastItem.index >= currentRow - 25 &&
         hasNextPage &&
         !isFetchingNextPage
       ) {

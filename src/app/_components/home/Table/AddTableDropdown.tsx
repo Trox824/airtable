@@ -1,8 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { type ColumnType } from "@prisma/client";
-import { api } from "~/trpc/react";
 import { useRouter, usePathname } from "next/navigation";
-import { v4 as uuidv4 } from "uuid";
 
 interface AddTableDropdownProps {
   dropdownRef: React.RefObject<HTMLDivElement>;
@@ -24,8 +21,6 @@ export function AddTableDropdown({
   createWithFakeData,
   isCreatingWithFakeData,
 }: AddTableDropdownProps) {
-  const router = useRouter();
-  const pathname = usePathname();
   const [dropdownPosition, setDropdownPosition] = useState<{
     top: number;
     left: number;
@@ -37,11 +32,8 @@ export function AddTableDropdown({
 
     const updateDropdownPosition = () => {
       const buttonRect = buttonRef.current!.getBoundingClientRect();
-      const dropdownRect = dropdownRef.current!.getBoundingClientRect();
-
       const top = buttonRect.bottom - 50; // 8px gap
       const left = buttonRect.left + window.scrollX;
-
       setDropdownPosition({ top, left });
     };
 
@@ -64,19 +56,16 @@ export function AddTableDropdown({
       });
     }
   };
-
   const handleAddFakeData = () => {
     if (!tableName.trim()) {
       alert("Please enter a table name first");
       return;
     }
-
     createWithFakeData({
       name: tableName.trim(),
       baseId: baseId,
     });
   };
-
   return (
     isOpen && (
       <div

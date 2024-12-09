@@ -3,7 +3,6 @@ import React from "react";
 import { BaseType } from "~/app/Types/types";
 interface BaseCardProps {
   base: BaseType;
-
   onDelete: () => void;
 }
 
@@ -18,7 +17,6 @@ export const BaseCard: React.FC<BaseCardProps> = ({ base, onDelete }) => {
         >
           <div className="flex h-full w-full items-center">
             <div className="mr-4 flex h-14 w-14 items-center justify-center rounded-lg bg-teal-500">
-              <div className="h-6 w-6 animate-spin rounded-full border-b-2 border-white" />
               <svg width="24" height="24" viewBox="0 0 16 16">
                 <use
                   fill="currentColor"

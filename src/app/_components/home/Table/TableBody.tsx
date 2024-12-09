@@ -97,18 +97,6 @@ export const TableBody = memo(function TableBody({
     [filterConditions],
   );
 
-  if (!mounted) {
-    return (
-      <tbody>
-        <tr>
-          <td colSpan={columns.length}>
-            <div className="h-8 animate-pulse bg-gray-100" />
-          </td>
-        </tr>
-      </tbody>
-    );
-  }
-
   return (
     <tbody>
       {paddingTop > 0 && (

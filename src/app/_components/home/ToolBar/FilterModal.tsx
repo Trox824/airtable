@@ -76,31 +76,6 @@ const FilterModal: React.FC<FilterModalProps> = ({
     },
   });
 
-  const handleAddCondition = () => {
-    if (selectedColumns[0] && selectedOperators[0]) {
-      const newCondition: FilterCondition = {
-        columnId: selectedColumns[0].id,
-        operator: selectedOperators[0],
-        value: inputValues[0] ?? null,
-      };
-      const newConditions = [...filterConditions, newCondition];
-
-      setFilterConditions(newConditions);
-
-      saveFiltersMutation.mutate({
-        viewId,
-        filters: newConditions.map((condition) => ({
-          ...condition,
-          value: condition.value ?? undefined,
-        })),
-      });
-
-      setSelectedColumns([null]);
-      setSelectedOperators([FilterOperator.GreaterThan]);
-      setInputValues([""]);
-    }
-  };
-
   const handleRemoveCondition = (index: number) => {
     const newConditions = filterConditions.filter((_, i) => i !== index);
 
@@ -157,20 +132,6 @@ const FilterModal: React.FC<FilterModalProps> = ({
       setSelectedColumns((prev) => [...prev, null]);
       setInputValues((prev) => [...prev, ""]);
     }
-  };
-
-  const handleRemoveFilterForm = (index: number) => {
-    setVisibleFilterForms((prev) => prev - 1);
-    setOpenDropdowns((prev) => {
-      const newDropdowns = { ...prev };
-      delete newDropdowns[index];
-      return newDropdowns;
-    });
-    setOpenOperatorDropdowns((prev) => {
-      const newDropdowns = { ...prev };
-      delete newDropdowns[index];
-      return newDropdowns;
-    });
   };
 
   const getOperatorsForColumn = (column: SimpleColumn | null) => {

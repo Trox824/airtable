@@ -2,7 +2,6 @@ import { api } from "~/trpc/react";
 import { toast } from "react-hot-toast";
 import cuid from "cuid";
 import { type Row, type SimpleColumn } from "../Types/types";
-import { type ColumnType } from "@prisma/client";
 import {
   type SortCondition,
   type FilterCondition,
@@ -10,7 +9,6 @@ import {
   Cell,
   RowWithCells,
 } from "../Types/types";
-import { useCallback } from "react";
 
 // Helper function to convert sort conditions
 function mapSortConditionsToAPI(conditions: SortCondition[]) {
@@ -291,8 +289,9 @@ export function useTableMutations(
     onSuccess: async (newRow, variables, context) => {
       const tempRowId = context?.optimisticRow?.id;
 
-      // Fetch the latest tempRow from the cache
-      const cachedData = utils.rows.getByTableId.getInfiniteData({
+      // Instead of updating the cache with both optimistic and server data,
+      // we should just invalidate the query to fetch fresh data
+      await utils.rows.getByTableId.invalidate({
         tableId,
         limit: 100,
         searchQuery,
@@ -300,77 +299,8 @@ export function useTableMutations(
         filterConditions,
       });
 
-      let tempRow: Row | undefined;
-      if (cachedData) {
-        for (const page of cachedData.pages) {
-          tempRow = page.items.find((row) => row.id === tempRowId);
-          if (tempRow) break;
-        }
-      }
-
-      // If we found a temp row, update each cell with its values
-      if (tempRow) {
-        const updatePromises = newRow.cells.map((newCell) => {
-          const tempCell = tempRow.cells.find(
-            (cell) => cell.columnId === newCell.columnId,
-          );
-
-          if (tempCell) {
-            return updateCell.mutate({
-              id: newCell.id,
-              valueText: tempCell.valueText,
-              valueNumber: tempCell.valueNumber,
-            });
-          }
-        });
-
-        // Wait for all cell updates to complete
-        await Promise.all(updatePromises);
-      }
-
-      // Update the cache with the new row ID but preserve temp values
-      utils.rows.getByTableId.setInfiniteData(
-        {
-          tableId,
-          limit: 100,
-          searchQuery,
-          sortConditions: mappedSortConditions,
-          filterConditions,
-        },
-        (oldData) => {
-          if (!oldData) return oldData;
-
-          return {
-            ...oldData,
-            pages: oldData.pages.map((page) => ({
-              ...page,
-              items: page.items.map((row) => {
-                if (row.id === tempRowId) {
-                  return {
-                    ...newRow,
-                    cells: newRow.cells.map((newCell) => {
-                      const tempCell = tempRow?.cells.find(
-                        (cell) => cell.columnId === newCell.columnId,
-                      );
-                      return {
-                        ...newCell,
-                        valueText: tempCell?.valueText ?? newCell.valueText,
-                        valueNumber:
-                          tempCell?.valueNumber ?? newCell.valueNumber,
-                      };
-                    }),
-                  };
-                }
-                return row;
-              }),
-            })),
-          };
-        },
-      );
-
       setIsTableCreating(false);
     },
-
     onSettled: () => {
       setIsTableCreating(false);
     },
@@ -394,7 +324,6 @@ export function useTableMutations(
           sortConditions: mappedSortConditions,
           filterConditions,
         });
-
         // Optimistically update the cell value
         utils.rows.getByTableId.setInfiniteData(
           {

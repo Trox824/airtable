@@ -9,7 +9,6 @@ interface TableHeaderProps {
   table: Table<Row>;
   isDropdownOpen: boolean;
   buttonRef: RefObject<HTMLButtonElement>;
-  dropdownRef: RefObject<HTMLDivElement>;
   onCreateColumn: (name: string, type: ColumnType) => void;
   onRenameColumn: (columnId: string, name: string) => void;
   setIsDropdownOpen: Dispatch<SetStateAction<boolean>>;
@@ -20,7 +19,6 @@ export function TableHeader({
   table,
   isDropdownOpen,
   buttonRef,
-  dropdownRef,
   onCreateColumn,
   onRenameColumn,
   setIsDropdownOpen,
@@ -53,8 +51,6 @@ export function TableHeader({
       {table.getHeaderGroups().map((headerGroup) => (
         <tr key={headerGroup.id} className="flex h-8">
           {headerGroup.headers.map((header) => {
-            const isSorted = isColumnSorted(header.column.id);
-
             return (
               <th
                 key={header.id}
@@ -136,7 +132,6 @@ export function TableHeader({
               </button>
               {isDropdownOpen && (
                 <AddColumnDropdown
-                  dropdownRef={dropdownRef}
                   buttonRef={buttonRef}
                   isOpen={isDropdownOpen}
                   onClose={() => setIsDropdownOpen(false)}
