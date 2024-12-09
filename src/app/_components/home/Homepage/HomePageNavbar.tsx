@@ -1,9 +1,14 @@
 import React from "react";
 interface NavbarProps {
   onLogout: () => Promise<void>;
+  user: {
+    name?: string | null;
+    email?: string | null;
+    image?: string | null;
+  };
 }
 
-const HomePageNavbar: React.FC<NavbarProps> = ({ onLogout }) => {
+const HomePageNavbar: React.FC<NavbarProps> = ({ onLogout, user }) => {
   return (
     <div className="z-20 flex h-12 w-full flex-row items-center justify-between border-b-[1px] border-black/10 bg-white px-2 sm:px-4">
       {/* Left section */}
@@ -87,8 +92,18 @@ const HomePageNavbar: React.FC<NavbarProps> = ({ onLogout }) => {
             <use href="/icons/icon_definitions.svg#Bell"></use>
           </svg>
         </button>
-        <div className="ml-2 flex h-8 w-8 items-center justify-center rounded-full bg-[#172B4D] text-white">
-          <span className="text-sm">N</span>
+        <div className="ml-2 flex h-8 w-8 items-center justify-center overflow-hidden rounded-full bg-[#172B4D] text-white">
+          {user.image ? (
+            <img
+              src={user.image}
+              alt={user.name ?? "User avatar"}
+              className="h-full w-full object-cover"
+            />
+          ) : (
+            <span className="text-sm">
+              {(user.name?.[0] ?? user.email?.[0] ?? "?").toUpperCase()}
+            </span>
+          )}
         </div>
         <button
           onClick={onLogout}

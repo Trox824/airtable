@@ -60,7 +60,6 @@ export const DataTable = memo(
     tableId,
     searchQuery,
     columns,
-
     sortConditions,
     sortedColumns,
     filterConditions,
@@ -153,21 +152,44 @@ export const DataTable = memo(
       setIsDropdownOpen(false);
     };
 
+    const handleFetchNextPage = useCallback(() => {
+      void fetchNextPage();
+    }, [fetchNextPage]);
+
+    // Move virtualizer declaration before its usage
+    const virtualizer = useTableVirtualizer(
+      tableContainerRef,
+      totalRowCount,
+      rows.length,
+      hasNextPage,
+      isFetchingNextPage,
+      handleFetchNextPage,
+    );
+
     const handleAddRow = useCallback(() => {
       incrementCount();
-      addRow.mutate({
-        tableId,
-      });
+      addRow.mutate(
+        { tableId },
+        {
+          onSuccess: () => {
+            // Force virtualizer to recalculate after row addition
+            virtualizer.measure();
+            // Scroll to the bottom to show the new row
+            if (tableContainerRef.current) {
+              tableContainerRef.current.scrollTop =
+                tableContainerRef.current.scrollHeight;
+            }
+          },
+        },
+      );
       setShouldRefetchCount(true);
-    }, [addRow, tableId, incrementCount]);
+    }, [addRow, tableId, incrementCount, virtualizer]);
+
+    // Move handleFetchNextPage before virtualizer
 
     const handleRenameColumn = (columnId: string, name: string) => {
       renameColumn.mutate({ columnId, name });
     };
-
-    const handleFetchNextPage = useCallback(() => {
-      void fetchNextPage();
-    }, [fetchNextPage]);
 
     // Reset the refetch flag after the mutation completes
     useEffect(() => {
@@ -176,15 +198,6 @@ export const DataTable = memo(
       }
     }, [shouldRefetchCount, addRow.isPending]);
 
-    // Add virtualizer
-    const virtualizer = useTableVirtualizer(
-      tableContainerRef,
-      totalRowCount ?? 0,
-      rows.length,
-      hasNextPage,
-      isFetchingNextPage,
-      handleFetchNextPage,
-    );
     return (
       <>
         <div className="flex h-[calc(100vh-theme(spacing.navbar)-4.5rem-theme(spacing.toolbar))] flex-1 flex-col bg-[#f8f8f8]">

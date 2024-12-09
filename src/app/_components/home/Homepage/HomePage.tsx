@@ -6,8 +6,10 @@ import { useBaseOperations } from "~/app/hooks/useBaseOperations";
 import HomePageNavbar from "./HomePageNavbar";
 import { Sidebar } from "./sidebar";
 import { ActionCards } from "./action-cards";
+import { useSession } from "next-auth/react";
 
 const HomePage: React.FC = () => {
+  const session = useSession();
   const [mounted, setMounted] = useState(false);
 
   const { handleCreateBase, handleDelete, pendingCreations } =
@@ -33,7 +35,10 @@ const HomePage: React.FC = () => {
 
   return (
     <div className="absolute h-full w-full overflow-hidden bg-[#F9FAFB]">
-      <HomePageNavbar onLogout={handleLogout} />
+      <HomePageNavbar
+        onLogout={handleLogout}
+        user={session?.data?.user ?? {}}
+      />
       <div className="z-10 flex h-[calc(100%-48px)] flex-row">
         <Sidebar />
         <div className="flex-1 px-4 pt-8 sm:px-8 lg:px-12">
