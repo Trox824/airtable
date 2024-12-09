@@ -23,44 +23,10 @@ type RowWithCells = Prisma.RowGetPayload<{
 type PaginatedResponse = {
   items: RowWithCells[];
   nextCursor?: string;
-  totalCount: number;
 };
 
 // Utility to parse numeric values safely
 const parseNumber = (value?: string) => (value ? parseFloat(value) : undefined);
-
-// Simplified filter condition builder
-const buildFilterCondition = ({
-  operator,
-  value,
-}: {
-  operator: FilterOperator;
-  value?: string | null;
-}): Prisma.CellWhereInput => {
-  switch (operator) {
-    case FilterOperator.Contains:
-      return { valueText: { contains: value ?? "", mode: "insensitive" } };
-    case FilterOperator.Equals:
-      return {
-        OR: [
-          { valueText: value ?? "" },
-          { valueNumber: value ? parseNumber(value) : null },
-        ],
-      };
-    case FilterOperator.GreaterThan:
-      return { valueNumber: { gt: parseNumber(value ?? undefined) } };
-    case FilterOperator.SmallerThan:
-      return { valueNumber: { lt: parseNumber(value ?? undefined) } };
-    case FilterOperator.IsEmpty:
-      return { valueText: "", valueNumber: null };
-    case FilterOperator.IsNotEmpty:
-      return {
-        OR: [{ valueText: { not: "" } }, { valueNumber: { not: null } }],
-      };
-    default:
-      return {};
-  }
-};
 
 // Define input type for better type safety
 const createRowInput = z.object({
@@ -320,7 +286,7 @@ export const rowsRouter = createTRPCRouter({
             'columnId', c."columnId",
             'rowId', c."rowId"
           )
-        ) FILTER (WHERE c.id IS NOT NULL), '[]') AS cells
+        ), '[]') AS cells
       FROM "Row" r
       LEFT JOIN "Cell" c ON c."rowId" = r.id
       ${joinClauses.join(" ")}
@@ -340,8 +306,6 @@ export const rowsRouter = createTRPCRouter({
           nextCursor = nextItem.id;
         }
 
-        const totalCount = await ctx.db.row.count({ where: { tableId } });
-
         const items: RowWithCells[] = rows.map((row) => ({
           ...row,
           cells: (row.cells || []).map((cell) => ({
@@ -356,7 +320,6 @@ export const rowsRouter = createTRPCRouter({
         return {
           items,
           nextCursor,
-          totalCount,
         };
       } catch (error) {
         console.error("Error executing raw query:", error);

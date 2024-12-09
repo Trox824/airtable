@@ -36,20 +36,23 @@ interface DataTableProps {
   setIsTableCreating: (isCreating: boolean) => void;
 }
 
-// Create a new hook
 const useTotalRowCount = (tableId: string, shouldRefetch: boolean) => {
-  const { data: totalRowCount, refetch } = api.rows.totalCount.useQuery(
+  const [optimisticCount, setOptimisticCount] = useState(0);
+  const totalCountQuery = api.rows.totalCount.useQuery(
     { tableId },
     { enabled: true },
   );
 
   useEffect(() => {
-    if (shouldRefetch) {
-      void refetch();
+    if (totalCountQuery.data !== undefined) {
+      setOptimisticCount(totalCountQuery.data);
     }
-  }, [shouldRefetch, refetch]);
+  }, [totalCountQuery.data]);
 
-  return totalRowCount;
+  return {
+    totalRowCount: optimisticCount,
+    incrementCount: () => setOptimisticCount((prev) => prev + 1),
+  };
 };
 
 export const DataTable = memo(
@@ -57,6 +60,7 @@ export const DataTable = memo(
     tableId,
     searchQuery,
     columns,
+
     sortConditions,
     sortedColumns,
     filterConditions,
@@ -74,10 +78,14 @@ export const DataTable = memo(
     const [isDropdownOpen, setIsDropdownOpen] = useState(false);
     const [shouldRefetchCount, setShouldRefetchCount] = useState(false);
 
-    const totalRowCount = useTotalRowCount(tableId, shouldRefetchCount);
+    const { totalRowCount, incrementCount } = useTotalRowCount(
+      tableId,
+      shouldRefetchCount,
+    );
 
     // Refs
     const tableContainerRef = useRef<HTMLDivElement>(null);
+    const dropdownRef = useRef<HTMLDivElement>(null);
     const buttonRef = useRef<HTMLButtonElement>(null);
 
     // Query data
@@ -146,11 +154,12 @@ export const DataTable = memo(
     };
 
     const handleAddRow = useCallback(() => {
+      incrementCount();
       addRow.mutate({
         tableId,
       });
       setShouldRefetchCount(true);
-    }, [addRow, tableId]);
+    }, [addRow, tableId, incrementCount]);
 
     const handleRenameColumn = (columnId: string, name: string) => {
       renameColumn.mutate({ columnId, name });
@@ -225,7 +234,7 @@ export const DataTable = memo(
           )}
         </div>
         <div className="fixed bottom-0 h-[40px] w-full border-t border-gray-300 bg-white p-2 text-xs text-gray-500">
-          {!isTableCreating && rows?.length} records
+          {rows.length} records
         </div>
       </>
     );

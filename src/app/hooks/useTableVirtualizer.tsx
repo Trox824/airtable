@@ -22,7 +22,7 @@ export function useTableVirtualizer(
       console.log(lastItem.index);
       console.log(currentRow);
       if (
-        lastItem.index >= currentRow - 25 &&
+        lastItem.index >= currentRow - 40 &&
         hasNextPage &&
         !isFetchingNextPage
       ) {

@@ -17,7 +17,6 @@ type RowWithCells = Prisma.RowGetPayload<{
 type PaginatedResponse = {
   items: RowWithCells[];
   nextCursor?: string;
-  totalCount: number;
 };
 
 export function useTableQuery(
