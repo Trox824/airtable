@@ -105,17 +105,7 @@ export const useBaseOperations = () => {
     }
   };
 
-  const isOptimisticBase = (baseId: string) => {
-    return pendingCreations.includes(baseId);
-  };
-
-  const isDeletingBase = (baseId: string) => {
-    return deletingBases.includes(baseId);
-  };
-
   return {
-    isOptimisticBase,
-    isDeletingBase,
     handleCreateBase,
     handleDelete,
     pendingCreations,

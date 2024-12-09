@@ -118,7 +118,6 @@ export default function TablePage() {
             tableId={memoizedTableId}
             searchQuery={memoizedSearchQuery}
             columns={memoizedColumns}
-            loadingColumns={loadingColumns}
             sortConditions={memoizedSortConditions}
             sortedColumns={memoizedSortedColumns}
             filterConditions={memoizedFilterConditions}

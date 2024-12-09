@@ -10,13 +10,8 @@ import { ActionCards } from "./action-cards";
 const HomePage: React.FC = () => {
   const [mounted, setMounted] = useState(false);
 
-  const {
-    isOptimisticBase,
-    isDeletingBase,
-    handleCreateBase,
-    handleDelete,
-    pendingCreations,
-  } = useBaseOperations();
+  const { handleCreateBase, handleDelete, pendingCreations } =
+    useBaseOperations();
 
   const {
     isLoading: apiLoading,
@@ -51,8 +46,6 @@ const HomePage: React.FC = () => {
             bases={bases ?? []}
             isLoading={apiLoading}
             creatingBases={pendingCreations}
-            isOptimisticBase={isOptimisticBase}
-            isDeletingBase={isDeletingBase}
             onCreateBase={handleCreateBase}
             onDeleteBase={(baseId) => handleDelete(baseId)}
           />

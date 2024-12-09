@@ -29,7 +29,6 @@ interface DataTableProps {
   tableId: string;
   searchQuery: string;
   columns: SimpleColumn[] | undefined;
-  loadingColumns: boolean;
   sortConditions: SortCondition[];
   sortedColumns: SortedColumn[];
   filterConditions: FilterCondition[];
@@ -42,7 +41,6 @@ export const DataTable = memo(
     tableId,
     searchQuery,
     columns,
-    loadingColumns,
     sortConditions,
     sortedColumns,
     filterConditions,

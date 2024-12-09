@@ -5,8 +5,6 @@ import { BaseType } from "~/app/Types/types";
 export interface BaseGridProps {
   bases: BaseType[];
   isLoading: boolean;
-  isOptimisticBase: (baseId: string) => boolean;
-  isDeletingBase: (baseId: string) => boolean;
   onCreateBase: (name: string) => Promise<void>;
   onDeleteBase: (baseId: string) => void;
   creatingBases: string[];
@@ -25,8 +23,6 @@ const LoadingSkeletonCard = () => (
 export const BaseGrid: React.FC<BaseGridProps> = ({
   bases,
   isLoading,
-  isOptimisticBase,
-  isDeletingBase,
   onCreateBase,
   onDeleteBase,
   creatingBases,
@@ -43,8 +39,6 @@ export const BaseGrid: React.FC<BaseGridProps> = ({
             <BaseCard
               key={base.id}
               base={base}
-              isOptimisticBase={isOptimisticBase(base.id)}
-              isDeletingBase={isDeletingBase(base.id)}
               onDelete={() => onDeleteBase(base.id)}
             />
           ))}

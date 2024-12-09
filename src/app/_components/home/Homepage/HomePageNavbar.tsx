@@ -1,5 +1,7 @@
 import React from "react";
-import { NavbarProps } from "~/app/Types/homeTypes";
+interface NavbarProps {
+  onLogout: () => Promise<void>;
+}
 
 const HomePageNavbar: React.FC<NavbarProps> = ({ onLogout }) => {
   return (
