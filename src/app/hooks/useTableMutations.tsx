@@ -51,7 +51,7 @@ export function useTableMutations(
       // Create optimistic column with temporary cells for existing rows
       const existingRows = utils.rows.getByTableId.getInfiniteData({
         tableId,
-        limit: 100,
+        limit: 200,
         searchQuery,
         sortConditions: mappedSortConditions,
         filterConditions,
@@ -79,7 +79,7 @@ export function useTableMutations(
           utils.rows.getByTableId.setInfiniteData(
             {
               tableId,
-              limit: 100,
+              limit: 200,
               searchQuery,
               sortConditions: mappedSortConditions,
               filterConditions,
@@ -120,7 +120,7 @@ export function useTableMutations(
       utils.rows.getByTableId.setInfiniteData(
         {
           tableId,
-          limit: 100,
+          limit: 200,
           searchQuery,
           sortConditions: mappedSortConditions,
           filterConditions,
@@ -163,7 +163,7 @@ export function useTableMutations(
       // Now proceed with updating the real cells in the database
       const cachedData = utils.rows.getByTableId.getInfiniteData({
         tableId,
-        limit: 100,
+        limit: 200,
         searchQuery,
         sortConditions: mappedSortConditions,
         filterConditions,
@@ -220,7 +220,7 @@ export function useTableMutations(
       setIsTableCreating(true);
       await utils.rows.getByTableId.cancel({
         tableId,
-        limit: 100,
+        limit: 200,
         searchQuery,
         sortConditions: mappedSortConditions,
         filterConditions,
@@ -228,7 +228,7 @@ export function useTableMutations(
 
       const previousData = utils.rows.getByTableId.getInfiniteData({
         tableId,
-        limit: 100,
+        limit: 200,
         searchQuery,
         sortConditions: mappedSortConditions,
         filterConditions,
@@ -261,7 +261,7 @@ export function useTableMutations(
       utils.rows.getByTableId.setInfiniteData(
         {
           tableId,
-          limit: 100,
+          limit: 200,
           searchQuery,
           sortConditions: mappedSortConditions,
           filterConditions,
@@ -306,7 +306,7 @@ export function useTableMutations(
         utils.rows.getByTableId.setInfiniteData(
           {
             tableId,
-            limit: 100,
+            limit: 200,
             searchQuery,
             sortConditions: mappedSortConditions,
             filterConditions,
@@ -322,7 +322,7 @@ export function useTableMutations(
       // Fetch the latest tempRow from the cache
       const cachedData = utils.rows.getByTableId.getInfiniteData({
         tableId,
-        limit: 100,
+        limit: 200,
         searchQuery,
         sortConditions: mappedSortConditions,
         filterConditions,
@@ -360,7 +360,7 @@ export function useTableMutations(
       utils.rows.getByTableId.setInfiniteData(
         {
           tableId,
-          limit: 100,
+          limit: 200,
           searchQuery,
           sortConditions: mappedSortConditions,
           filterConditions,
@@ -409,7 +409,7 @@ export function useTableMutations(
       if (!newCell.id.startsWith("temp_")) {
         await utils.rows.getByTableId.cancel({
           tableId,
-          limit: 100,
+          limit: 200,
           searchQuery,
           sortConditions: mappedSortConditions,
           filterConditions,
@@ -417,7 +417,7 @@ export function useTableMutations(
 
         const previousData = utils.rows.getByTableId.getInfiniteData({
           tableId,
-          limit: 100,
+          limit: 200,
           searchQuery,
           sortConditions: mappedSortConditions,
           filterConditions,
@@ -427,7 +427,7 @@ export function useTableMutations(
         utils.rows.getByTableId.setInfiniteData(
           {
             tableId,
-            limit: 100,
+            limit: 200,
             searchQuery,
             sortConditions: mappedSortConditions,
             filterConditions,
@@ -476,7 +476,7 @@ export function useTableMutations(
         utils.rows.getByTableId.setInfiniteData(
           {
             tableId,
-            limit: 100,
+            limit: 200,
             searchQuery,
             sortConditions: mappedSortConditions,
             filterConditions,
@@ -492,7 +492,7 @@ export function useTableMutations(
       utils.rows.getByTableId.setInfiniteData(
         {
           tableId,
-          limit: 100,
+          limit: 200,
           searchQuery,
           sortConditions: mappedSortConditions,
           filterConditions,
@@ -530,7 +530,7 @@ export function useTableMutations(
     utils.rows.getByTableId.setInfiniteData(
       {
         tableId,
-        limit: 100,
+        limit: 200,
         searchQuery,
         sortConditions: mappedSortConditions,
         filterConditions,

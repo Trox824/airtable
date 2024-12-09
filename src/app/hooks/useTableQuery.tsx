@@ -28,7 +28,7 @@ export function useTableQuery(
   const queryParams = useMemo(
     () => ({
       tableId,
-      limit: 100,
+      limit: 200,
       searchQuery,
       sortConditions: sortConditions.map((condition) => ({
         columnId: condition.columnId,

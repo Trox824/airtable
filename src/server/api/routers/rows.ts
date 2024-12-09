@@ -135,7 +135,7 @@ export const rowsRouter = createTRPCRouter({
     .input(
       z.object({
         tableId: z.string(),
-        limit: z.number().min(1).max(1000).default(100),
+        limit: z.number().min(1).max(1000).default(200),
         cursor: z.string().optional(),
         searchQuery: z.string().optional(),
         sortConditions: z

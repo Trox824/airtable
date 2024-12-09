@@ -185,8 +185,6 @@ export const DataTable = memo(
       setShouldRefetchCount(true);
     }, [addRow, tableId, incrementCount, virtualizer]);
 
-    // Move handleFetchNextPage before virtualizer
-
     const handleRenameColumn = (columnId: string, name: string) => {
       renameColumn.mutate({ columnId, name });
     };
@@ -247,7 +245,7 @@ export const DataTable = memo(
           )}
         </div>
         <div className="fixed bottom-0 h-[40px] w-full border-t border-gray-300 bg-white p-2 text-xs text-gray-500">
-          {rows.length} records
+          {totalRowCount} records
         </div>
       </>
     );
