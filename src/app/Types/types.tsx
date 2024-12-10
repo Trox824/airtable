@@ -29,6 +29,7 @@ export interface TableColumn {
   updatedAt: Date;
   tableId: string;
   columnDef: ColumnDef<Row, string | number | null>;
+  cells?: Cell[];
 }
 
 // Define sorted column structure
@@ -121,3 +122,19 @@ export interface LocalCellUpdate {
 
 // Define a map type for local updates
 export type LocalUpdatesMap = Record<string, LocalCellUpdate>;
+
+export type LocalUpdate = {
+  id: string;
+  valueText?: string | null;
+  valueNumber?: number | null;
+  tempRowId?: string; // To track which temporary row this update belongs to
+};
+
+// Ad
+// Add this to your types file
+export interface PaginatedResponse {
+  items: Row[];
+  total: number;
+  hasMore: boolean;
+  nextCursor?: string;
+}

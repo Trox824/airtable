@@ -19,7 +19,7 @@ export function useTableVirtualizer(
       if (!lastItem) return;
 
       if (
-        lastItem.index >= currentRow - 100 &&
+        lastItem.index >= currentRow - 250 &&
         hasNextPage &&
         !isFetchingNextPage
       ) {
@@ -27,8 +27,6 @@ export function useTableVirtualizer(
       }
     },
   });
-
-  // Force recalculation when rowCount changes
   useEffect(() => {
     virtualizer.measure();
   }, [rowCount, virtualizer]);

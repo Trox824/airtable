@@ -67,10 +67,9 @@ export const useTableConfig = ({
         console.error("Row not found", { rowIndex });
         return;
       }
-
       const cell = row.cells.find((c) => c.columnId === columnId);
       if (!cell) {
-        console.error("Cell not found", { rowIndex, columnId });
+        console.log("Cell not found", { rowIndex, columnId });
         return;
       }
 

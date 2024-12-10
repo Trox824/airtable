@@ -11,6 +11,12 @@ import {
   RowWithCells,
 } from "../Types/types";
 
+// Add this interface near the top of the file with other types
+interface TempCellValues {
+  valueText: string | null;
+  valueNumber: number | null;
+}
+
 // Helper function to convert sort conditions
 function mapSortConditionsToAPI(conditions: SortCondition[]) {
   return conditions.map((condition) => ({
@@ -51,7 +57,7 @@ export function useTableMutations(
       // Create optimistic column with temporary cells for existing rows
       const existingRows = utils.rows.getByTableId.getInfiniteData({
         tableId,
-        limit: 200,
+        limit: 500,
         searchQuery,
         sortConditions: mappedSortConditions,
         filterConditions,
@@ -79,7 +85,7 @@ export function useTableMutations(
           utils.rows.getByTableId.setInfiniteData(
             {
               tableId,
-              limit: 200,
+              limit: 500,
               searchQuery,
               sortConditions: mappedSortConditions,
               filterConditions,
@@ -114,87 +120,131 @@ export function useTableMutations(
     },
 
     onSuccess: async (newColumn, variables, context) => {
-      const tempColumnId = context?.tempColumnId;
+      const { tempColumnId } = context;
 
-      // Update the cache to preserve temp values while replacing temp column with real column
+      // First, get the current cache state before any updates
+      const currentCacheData = utils.rows.getByTableId.getInfiniteData({
+        tableId,
+        limit: 500,
+        searchQuery,
+        sortConditions: mappedSortConditions,
+        filterConditions,
+      });
+
+      // Store the temporary values
+      const tempCellValues = new Map<string, TempCellValues>();
+      currentCacheData?.pages.forEach((page) => {
+        page.items.forEach((row) => {
+          const tempCell = row.cells.find(
+            (cell) => cell.columnId === tempColumnId,
+          );
+          if (tempCell) {
+            tempCellValues.set(row.id, {
+              valueText: tempCell.valueText,
+              valueNumber: tempCell.valueNumber,
+            });
+          }
+        });
+      });
+
+      // Update the columns cache with the real column ID
+      utils.columns.getByTableId.setData({ tableId }, (oldColumns) =>
+        (oldColumns ?? []).map((col) =>
+          col.id === tempColumnId
+            ? {
+                ...col,
+                id: newColumn.id,
+                name: newColumn.name,
+                type: newColumn.type,
+              }
+            : col,
+        ),
+      );
+
+      // Invalidate and wait for the new data
+      await utils.rows.getByTableId.invalidate({
+        tableId,
+        limit: 500,
+        searchQuery,
+        sortConditions: mappedSortConditions,
+        filterConditions,
+      });
+
+      // After invalidation, update the cache with the stored temporary values
       utils.rows.getByTableId.setInfiniteData(
         {
           tableId,
-          limit: 200,
+          limit: 500,
           searchQuery,
           sortConditions: mappedSortConditions,
           filterConditions,
         },
         (oldData) => {
           if (!oldData) return oldData;
-
           return {
             ...oldData,
             pages: oldData.pages.map((page) => ({
               ...page,
-              items: page.items.map((row) => ({
-                ...row,
-                cells: row.cells
-                  .map((cell) => {
-                    if (cell.columnId === tempColumnId) {
-                      // Find the corresponding real cell
-                      const realCell = row.cells.find(
-                        (c) =>
-                          c.columnId === newColumn.id &&
-                          !c.id.startsWith("temp_"),
-                      );
-                      if (realCell) {
-                        return {
-                          ...realCell,
-                          valueText: cell.valueText ?? realCell.valueText,
-                          valueNumber: cell.valueNumber ?? realCell.valueNumber,
-                        };
-                      }
+              items: page.items.map((row) => {
+                const tempValues = tempCellValues.get(row.id);
+                if (!tempValues) return row;
+
+                return {
+                  ...row,
+                  cells: row.cells.map((cell) => {
+                    if (cell.columnId === newColumn.id) {
+                      return {
+                        ...cell,
+                        valueText: tempValues.valueText,
+                        valueNumber: tempValues.valueNumber,
+                      };
                     }
                     return cell;
-                  })
-                  .filter((cell) => cell.columnId !== tempColumnId), // Remove temp cells
-              })),
+                  }),
+                };
+              }),
             })),
           };
         },
       );
 
-      // Now proceed with updating the real cells in the database
+      // Step 3: After updating the cache, fetch the updated rows data from the cache
+      // and commit the temporary cell values to the backend.
       const cachedData = utils.rows.getByTableId.getInfiniteData({
         tableId,
-        limit: 200,
+        limit: 500,
         searchQuery,
         sortConditions: mappedSortConditions,
         filterConditions,
       });
-
+      console.log("cachedData", JSON.stringify(cachedData, null, 2));
       if (cachedData && tempColumnId) {
         const updatePromises: Promise<void>[] = [];
-
         cachedData.pages.forEach((page) => {
-          page.items.forEach((row: RowWithCells) => {
+          page.items.forEach((row) => {
             const realCell = row.cells.find(
-              (cell) =>
-                cell.columnId === newColumn.id && !cell.id.startsWith("temp_"),
+              (cell) => cell.columnId === newColumn.id,
             );
+            if (realCell && !realCell.id.startsWith("temp_")) {
+              // Persist the optimistically set values to the backend
 
-            if (realCell) {
               const updatePromise = updateCell
                 .mutateAsync({
                   id: realCell.id,
                   valueText: realCell.valueText,
                   valueNumber: realCell.valueNumber,
                 })
-                .then(() => void 0);
+                .then(() => void 0); // Ensure promise resolves to void
               updatePromises.push(updatePromise);
             }
           });
         });
 
+        // Wait for all cell updates to complete
         await Promise.all(updatePromises);
       }
 
+      // Finally, turn off the "creating" state
       setIsTableCreating(false);
     },
 
@@ -207,12 +257,6 @@ export function useTableMutations(
         );
       }
     },
-
-    onSettled: async () => {
-      setIsTableCreating(false);
-      await utils.columns.getByTableId.invalidate({ tableId });
-      await utils.rows.getByTableId.invalidate({ tableId });
-    },
   });
 
   const addRow = api.rows.create.useMutation({
@@ -220,7 +264,7 @@ export function useTableMutations(
       setIsTableCreating(true);
       await utils.rows.getByTableId.cancel({
         tableId,
-        limit: 200,
+        limit: 500,
         searchQuery,
         sortConditions: mappedSortConditions,
         filterConditions,
@@ -228,7 +272,7 @@ export function useTableMutations(
 
       const previousData = utils.rows.getByTableId.getInfiniteData({
         tableId,
-        limit: 200,
+        limit: 500,
         searchQuery,
         sortConditions: mappedSortConditions,
         filterConditions,
@@ -261,7 +305,7 @@ export function useTableMutations(
       utils.rows.getByTableId.setInfiniteData(
         {
           tableId,
-          limit: 200,
+          limit: 500,
           searchQuery,
           sortConditions: mappedSortConditions,
           filterConditions,
@@ -272,13 +316,9 @@ export function useTableMutations(
               pages: [{ items: [optimisticRow], totalCount: 1 }],
               pageParams: [],
             };
-
           const newPages = [...oldData.pages];
           if (newPages[0]) {
             const shouldInsertAtStart = sortConditions.some((condition) => {
-              const cell = optimisticRow.cells.find(
-                (c) => c.columnId === condition.columnId,
-              );
               return condition.order === "9-0" || condition.order === "desc";
             });
 
@@ -289,7 +329,6 @@ export function useTableMutations(
                 : [...newPages[0].items, optimisticRow],
             };
           }
-
           return {
             ...oldData,
             pages: newPages,
@@ -297,7 +336,6 @@ export function useTableMutations(
           };
         },
       );
-
       return { previousData, optimisticRow };
     },
     onError: (err, newRow, context) => {
@@ -306,7 +344,7 @@ export function useTableMutations(
         utils.rows.getByTableId.setInfiniteData(
           {
             tableId,
-            limit: 200,
+            limit: 500,
             searchQuery,
             sortConditions: mappedSortConditions,
             filterConditions,
@@ -322,7 +360,7 @@ export function useTableMutations(
       // Fetch the latest tempRow from the cache
       const cachedData = utils.rows.getByTableId.getInfiniteData({
         tableId,
-        limit: 200,
+        limit: 500,
         searchQuery,
         sortConditions: mappedSortConditions,
         filterConditions,
@@ -360,7 +398,7 @@ export function useTableMutations(
       utils.rows.getByTableId.setInfiniteData(
         {
           tableId,
-          limit: 200,
+          limit: 500,
           searchQuery,
           sortConditions: mappedSortConditions,
           filterConditions,
@@ -409,7 +447,7 @@ export function useTableMutations(
       if (!newCell.id.startsWith("temp_")) {
         await utils.rows.getByTableId.cancel({
           tableId,
-          limit: 200,
+          limit: 500,
           searchQuery,
           sortConditions: mappedSortConditions,
           filterConditions,
@@ -417,7 +455,7 @@ export function useTableMutations(
 
         const previousData = utils.rows.getByTableId.getInfiniteData({
           tableId,
-          limit: 200,
+          limit: 500,
           searchQuery,
           sortConditions: mappedSortConditions,
           filterConditions,
@@ -427,7 +465,7 @@ export function useTableMutations(
         utils.rows.getByTableId.setInfiniteData(
           {
             tableId,
-            limit: 200,
+            limit: 500,
             searchQuery,
             sortConditions: mappedSortConditions,
             filterConditions,
@@ -476,7 +514,7 @@ export function useTableMutations(
         utils.rows.getByTableId.setInfiniteData(
           {
             tableId,
-            limit: 200,
+            limit: 500,
             searchQuery,
             sortConditions: mappedSortConditions,
             filterConditions,
@@ -492,14 +530,13 @@ export function useTableMutations(
       utils.rows.getByTableId.setInfiniteData(
         {
           tableId,
-          limit: 200,
+          limit: 500,
           searchQuery,
           sortConditions: mappedSortConditions,
           filterConditions,
         },
         (oldData) => {
           if (!oldData) return oldData;
-
           return {
             ...oldData,
             pages: oldData.pages.map((page) => ({
@@ -521,16 +558,13 @@ export function useTableMutations(
         },
       );
     },
-    onSettled: async () => {
-      await utils.rows.getByTableId.invalidate({ tableId });
-    },
   });
 
   const updateTempCell = (newCell: UpdateCellParams) => {
     utils.rows.getByTableId.setInfiniteData(
       {
         tableId,
-        limit: 200,
+        limit: 500,
         searchQuery,
         sortConditions: mappedSortConditions,
         filterConditions,

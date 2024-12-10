@@ -33,7 +33,7 @@ export function AddTableDropdown({
     const updateDropdownPosition = () => {
       const buttonRect = buttonRef.current!.getBoundingClientRect();
       const top = buttonRect.bottom - 50; // 8px gap
-      const left = buttonRect.left + window.scrollX;
+      const left = buttonRect.left;
       setDropdownPosition({ top, left });
     };
 

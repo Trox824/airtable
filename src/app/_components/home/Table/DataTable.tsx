@@ -165,14 +165,12 @@ export const DataTable = memo(
       isFetchingNextPage,
       handleFetchNextPage,
     );
-
     const handleAddRow = useCallback(() => {
       incrementCount();
       addRow.mutate(
         { tableId },
         {
           onSuccess: () => {
-            // Force virtualizer to recalculate after row addition
             virtualizer.measure();
             // Scroll to the bottom to show the new row
             if (tableContainerRef.current) {
