@@ -47,6 +47,8 @@ export const Switch: React.FC<SwitchProps> = ({ checked, onCheckedChange }) => {
   );
 };
 
+const MemoizedSwitch = React.memo(Switch);
+
 export const HideModal: React.FC<HideModalProps> = ({
   viewId,
   columns,
@@ -100,15 +102,16 @@ export const HideModal: React.FC<HideModalProps> = ({
     columnId: string,
     newVisibility?: Record<string, boolean>,
   ) => {
+    // Create the updated visibility state
     const updatedVisibility = newVisibility ?? {
       ...columnVisibility,
       [columnId]: !columnVisibility[columnId],
     };
 
-    // Update local state first
+    // Optimistically update the local state immediately
     onToggleVisibility(columnId, updatedVisibility);
 
-    // Save to database
+    // Debounced database update
     try {
       await updateColumnVisibility.mutateAsync({
         viewId,
@@ -179,7 +182,7 @@ export const HideModal: React.FC<HideModalProps> = ({
                     >
                       <div className="flex flex-grow items-center rounded-sm px-2 hover:bg-gray-100">
                         <div className="flex h-full w-8 items-center">
-                          <Switch
+                          <MemoizedSwitch
                             checked={columnVisibility[column.id] !== false}
                             onCheckedChange={() =>
                               handleToggleVisibility(column.id)

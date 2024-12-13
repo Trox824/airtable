@@ -104,7 +104,7 @@ export default function TablePage() {
       try {
         const parsedVisibility = JSON.parse(
           initialVisibility.columnVisibility as string,
-        );
+        ) as VisibilityState;
         setColumnVisibility(parsedVisibility);
       } catch (error) {
         console.error("Failed to parse column visibility:", error);

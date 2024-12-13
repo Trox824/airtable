@@ -1,5 +1,5 @@
 "use client";
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import {
   DragDropContext,
   Droppable,
@@ -86,8 +86,24 @@ export default function Toolbar({
       try {
         const parsedVisibility = JSON.parse(
           initialVisibility.columnVisibility as string,
-        );
-        onColumnVisibilityChange(parsedVisibility);
+        ) as Record<string, boolean>;
+
+        // Type guard function to verify the parsed data
+        const isValidVisibilityState = (
+          obj: unknown,
+        ): obj is VisibilityState => {
+          return (
+            obj !== null &&
+            typeof obj === "object" &&
+            Object.values(obj).every((value) => typeof value === "boolean")
+          );
+        };
+
+        if (isValidVisibilityState(parsedVisibility)) {
+          onColumnVisibilityChange(parsedVisibility);
+        } else {
+          console.error("Invalid visibility state format");
+        }
       } catch (error) {
         console.error("Failed to parse column visibility:", error);
       }
@@ -155,19 +171,22 @@ export default function Toolbar({
     setOpenViewBar(!openViewBar);
   };
 
-  const handleToggleVisibility = (
-    columnId: string,
-    newVisibility?: Record<string, boolean>,
-  ) => {
-    if (columnId === "__ALL__" && newVisibility) {
-      onColumnVisibilityChange(newVisibility);
-    } else {
-      onColumnVisibilityChange((prev) => ({
-        ...prev,
-        [columnId]: !prev[columnId],
-      }));
-    }
-  };
+  const handleToggleVisibility = useCallback(
+    (columnId: string, newVisibility?: Record<string, boolean>) => {
+      if (columnId === "__ALL__" && newVisibility) {
+        onColumnVisibilityChange(newVisibility);
+        return;
+      }
+
+      const updatedVisibility = {
+        ...columnVisibility,
+        [columnId]: !columnVisibility[columnId],
+      };
+
+      onColumnVisibilityChange(updatedVisibility);
+    },
+    [columnVisibility, onColumnVisibilityChange],
+  );
 
   const handleColumnReorder = (startIndex: number, endIndex: number) => {
     if (!columns) return;
