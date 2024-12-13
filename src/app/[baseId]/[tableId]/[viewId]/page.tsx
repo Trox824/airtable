@@ -1,42 +1,57 @@
 "use client";
+// 1. Import grouping
 import { useState, useCallback, useEffect, useMemo } from "react";
+import { useParams } from "next/navigation";
+import { type VisibilityState, type OnChangeFn } from "@tanstack/react-table";
+
+// Local imports
 import Toolbar from "~/app/_components/home/ToolBar/toolBar";
 import ViewSideBar from "~/app/_components/home/Table/ViewSideBar";
 import { DataTable } from "~/app/_components/home/Table/DataTable";
-import { useParams } from "next/navigation";
+import { TableTabs } from "~/app/_components/home/TableTabs";
 import { api } from "~/trpc/react";
 import {
   type SortCondition,
   type SortedColumn,
   type FilterCondition,
+  SimpleColumn,
 } from "../../../Types/types";
-import { TableTabs } from "~/app/_components/home/TableTabs";
+
 export default function TablePage() {
+  // 2. Route params
   const { tableId, baseId, viewId } = useParams();
-  const [searchQuery, setSearchQuery] = useState("");
+
+  // 3. API queries
+  const { data: columns, isLoading: loadingColumns } =
+    api.columns.getByTableId.useQuery({ tableId: tableId as string });
+  const { data: initialSortConditions } = api.view.getSortConditions.useQuery({
+    viewId: viewId as string,
+  });
+  const { data: initialFilterConditions } =
+    api.view.getFilterConditions.useQuery({
+      viewId: viewId as string,
+    });
+  const { data: columnOrder } = api.view.getColumnOrder.useQuery({
+    viewId: viewId as string,
+  });
+
+  // 4. UI state
   const [openViewBar, setOpenViewBar] = useState(false);
   const [openSortModal, setOpenSortModal] = useState(false);
   const [openFilterModal, setOpenFilterModal] = useState(false);
+  const [isTableCreating, setIsTableCreating] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+
+  // 5. Table state
   const [sortConditions, setSortConditions] = useState<SortCondition[]>([]);
   const [sortedColumns, setSortedColumns] = useState<SortedColumn[]>([]);
   const [filterConditions, setFilterConditions] = useState<FilterCondition[]>(
     [],
   );
-  const [isTableCreating, setIsTableCreating] = useState(false);
+  const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({});
+  const [localColumns, setLocalColumns] = useState<SimpleColumn[]>([]);
 
-  const { data: columns, isLoading: loadingColumns } =
-    api.columns.getByTableId.useQuery({ tableId: tableId as string });
-
-  const { data: initialSortConditions, isLoading } =
-    api.view.getSortConditions.useQuery({
-      viewId: viewId as string,
-    });
-
-  const { data: initialFilterConditions } =
-    api.view.getFilterConditions.useQuery({
-      viewId: viewId as string,
-    });
-
+  // 6. Effects
   useEffect(() => {
     if (initialSortConditions && columns) {
       setSortedColumns(
@@ -57,11 +72,25 @@ export default function TablePage() {
     }
   }, [initialFilterConditions]);
 
-  const handleSort = useCallback((conditions: SortCondition[]) => {
-    setSortConditions(conditions);
-  }, []);
+  useEffect(() => {
+    if (columns && columnOrder) {
+      const orderedColumns = [...columns].sort((a, b) => {
+        const orderA =
+          columnOrder.find((o) => o.columnId === a.id)?.order ?? Infinity;
+        const orderB =
+          columnOrder.find((o) => o.columnId === b.id)?.order ?? Infinity;
+        return orderA - orderB;
+      });
+      setLocalColumns(orderedColumns);
+    } else if (columns) {
+      setLocalColumns(columns);
+    }
+  }, [columns, columnOrder]);
 
-  const memoizedColumns = useMemo(() => columns, [columns]);
+  // 7. Memoized values
+  const memoizedColumns = useMemo(() => localColumns, [localColumns]);
+  const memoizedTableId = useMemo(() => tableId as string, [tableId]);
+  const memoizedSearchQuery = useMemo(() => searchQuery, [searchQuery]);
   const memoizedSortConditions = useMemo(
     () => sortConditions,
     [sortConditions],
@@ -72,9 +101,23 @@ export default function TablePage() {
     [filterConditions],
   );
 
-  const memoizedTableId = useMemo(() => tableId as string, [tableId]);
-  const memoizedSearchQuery = useMemo(() => searchQuery, [searchQuery]);
+  // 8. Handlers
+  const handleSort = useCallback((conditions: SortCondition[]) => {
+    setSortConditions(conditions);
+  }, []);
 
+  const handleColumnVisibilityChange: OnChangeFn<VisibilityState> = useCallback(
+    (updaterOrValue) => {
+      setColumnVisibility(
+        typeof updaterOrValue === "function"
+          ? updaterOrValue(columnVisibility)
+          : updaterOrValue,
+      );
+    },
+    [columnVisibility],
+  );
+
+  // 9. Render
   return (
     <div className="relative">
       <TableTabs
@@ -99,9 +142,11 @@ export default function TablePage() {
         setSortedColumns={setSortedColumns}
         filterConditions={memoizedFilterConditions}
         setFilterConditions={setFilterConditions}
+        columnVisibility={columnVisibility}
+        onColumnVisibilityChange={handleColumnVisibilityChange}
+        setColumns={setLocalColumns}
       />
       <div className="mt-[calc(theme(spacing.navbar)+2rem+theme(spacing.toolbar))] flex">
-        {/* Sidebar */}
         <div
           className={`transition-all duration-300 ${openViewBar ? "w-[300px]" : "w-0"}`}
         >
@@ -123,6 +168,8 @@ export default function TablePage() {
             filterConditions={memoizedFilterConditions}
             isTableCreating={isTableCreating}
             setIsTableCreating={setIsTableCreating}
+            columnVisibility={columnVisibility}
+            onColumnVisibilityChange={handleColumnVisibilityChange}
           />
         </div>
       </div>

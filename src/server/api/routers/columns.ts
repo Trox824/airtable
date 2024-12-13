@@ -48,7 +48,7 @@ export const columnsRouter = createTRPCRouter({
           ).map((row) => ({
             columnId: column.id,
             rowId: row.id,
-            valueText: input.type === ColumnType.Text ? "" : null,
+            valueText: null,
             valueNumber: null,
           })),
         });

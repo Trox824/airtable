@@ -3,8 +3,6 @@ import { createTRPCRouter, publicProcedure } from "../trpc";
 import { TRPCError } from "@trpc/server";
 import { authOptions } from "~/server/auth";
 import { getServerSession } from "next-auth";
-import { PrismaClient } from "@prisma/client";
-
 const validateSession = async () => {
   const session = await getServerSession(authOptions);
   if (!session) {
@@ -42,6 +40,7 @@ export const baseRouter = createTRPCRouter({
             data: {
               tableId: table.id,
               name: "Grid view",
+              columnVisibility: JSON.stringify({}),
             },
           });
 
@@ -64,7 +63,29 @@ export const baseRouter = createTRPCRouter({
           // Get the created columns to access their IDs
           const createdColumns = await tx.column.findMany({
             where: { tableId: table.id },
+            orderBy: { createdAt: "asc" },
           });
+
+          // Update the view with default column visibility
+          await tx.view.update({
+            where: { id: view.id },
+            data: {
+              columnVisibility: Object.fromEntries(
+                createdColumns.map((column) => [column.id, true]),
+              ),
+            },
+          });
+
+          // Instead of createMany (which might not be supported), create each column order individually
+          for (const [index, column] of createdColumns.entries()) {
+            await tx.columnOrder.create({
+              data: {
+                viewId: view.id,
+                columnId: column.id,
+                order: index,
+              },
+            });
+          }
 
           // Create two rows
           const rows = await tx.row.createMany({
@@ -82,8 +103,8 @@ export const baseRouter = createTRPCRouter({
               createdColumns.map((column) => ({
                 rowId: row.id,
                 columnId: column.id,
-                valueText: column.type === "Text" ? "" : null,
-                valueNumber: column.type === "Number" ? null : null,
+                valueText: null,
+                valueNumber: null,
               })),
             ),
           });
@@ -113,22 +134,30 @@ export const baseRouter = createTRPCRouter({
     }),
 
   getAll: publicProcedure.query(async ({ ctx }) => {
-    const session = await validateSession();
-    return ctx.db.base.findMany({
-      where: { userId: session.user.id },
-      include: {
-        tables: {
-          include: {
-            views: {
-              select: {
-                id: true,
-                name: true,
+    try {
+      const session = await validateSession();
+      return await ctx.db.base.findMany({
+        where: { userId: session.user.id },
+        include: {
+          tables: {
+            include: {
+              views: {
+                select: {
+                  id: true,
+                  name: true,
+                },
               },
             },
           },
         },
-      },
-    });
+      });
+    } catch (error) {
+      throw new TRPCError({
+        code: "INTERNAL_SERVER_ERROR",
+        message: "Failed to fetch bases. Please check database connection.",
+        cause: error,
+      });
+    }
   }),
 
   delete: publicProcedure

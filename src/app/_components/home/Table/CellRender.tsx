@@ -13,6 +13,7 @@ interface CellRendererProps {
   };
   searchQuery?: string;
   isHighlighted?: boolean;
+  onCellUpdate?: () => Promise<void>;
 }
 
 export const CellRenderer = memo(function CellRenderer({
@@ -21,6 +22,7 @@ export const CellRenderer = memo(function CellRenderer({
   meta,
   isHighlighted,
   searchQuery,
+  onCellUpdate,
 }: CellRendererProps) {
   const [localValue, setLocalValue] = useState<string | number | null>(
     info.getValue(),
@@ -52,7 +54,7 @@ export const CellRenderer = memo(function CellRenderer({
     }
   };
 
-  const onBlur = () => {
+  const onBlur = async () => {
     setIsEditing(false);
     setEditing?.(false);
 
@@ -62,7 +64,11 @@ export const CellRenderer = memo(function CellRenderer({
       typeof localValue === "string" && localValue.trim() === ""
         ? null
         : localValue;
+
     meta?.updateData(info.row.index, info.column.id, valueToUpdate);
+    if (onCellUpdate) {
+      await onCellUpdate();
+    }
   };
 
   const onFocus = () => {
@@ -81,7 +87,7 @@ export const CellRenderer = memo(function CellRenderer({
         autoFocus
         onKeyDown={(e) => {
           if (e.key === "Enter") {
-            onBlur();
+            void onBlur();
           }
         }}
       />

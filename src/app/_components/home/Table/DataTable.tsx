@@ -4,7 +4,12 @@ import { useState, useRef, memo, useCallback, useMemo, useEffect } from "react";
 import { TableLoadingState } from "./TableLoading";
 import { TableHeader } from "./TableHeader";
 import { TableBody } from "./TableBody";
-import { ColumnDef, useReactTable } from "@tanstack/react-table";
+import {
+  ColumnDef,
+  useReactTable,
+  type VisibilityState,
+  type OnChangeFn,
+} from "@tanstack/react-table";
 import { SortedColumn } from "../../../Types/types";
 import { type ColumnType } from "@prisma/client";
 import {
@@ -34,6 +39,8 @@ interface DataTableProps {
   filterConditions: FilterCondition[];
   isTableCreating: boolean;
   setIsTableCreating: (isCreating: boolean) => void;
+  columnVisibility: VisibilityState;
+  onColumnVisibilityChange: OnChangeFn<VisibilityState>;
 }
 
 const useTotalRowCount = (tableId: string, shouldRefetch: boolean) => {
@@ -65,6 +72,8 @@ export const DataTable = memo(
     filterConditions,
     isTableCreating,
     setIsTableCreating,
+    columnVisibility,
+    onColumnVisibilityChange,
   }: DataTableProps) => {
     // State
     const [columnSizing, setColumnSizing] = useState<Record<string, number>>(
@@ -84,28 +93,29 @@ export const DataTable = memo(
 
     // Refs
     const tableContainerRef = useRef<HTMLDivElement>(null);
-    const dropdownRef = useRef<HTMLDivElement>(null);
     const buttonRef = useRef<HTMLButtonElement>(null);
 
-    // Query data
     const {
       data: rowsData,
       isLoading: loadingRows,
       hasNextPage,
       fetchNextPage,
       isFetchingNextPage,
+      refetch,
+      refetchData,
     } = useTableQuery(tableId, searchQuery, sortConditions, filterConditions);
 
     // Mutations
     const { addColumn, addRow, updateCell, updateTempCell, renameColumn } =
-      useTableMutations(
+      useTableMutations({
         tableId,
         searchQuery,
         sortConditions,
         filterConditions,
-        columns ?? [],
+        columns: columns ?? [],
         setIsTableCreating,
-      );
+        refetchData,
+      });
 
     // Memoize handlers
     const handleUpdateCell = useCallback(
@@ -131,6 +141,11 @@ export const DataTable = memo(
     // Update the memoized table columns to use the result instead of the hook
     const memoizedTableColumns = useMemo(() => tableColumns, [tableColumns]);
 
+    // Create a refetch handler
+    const handleRefetch = useCallback(async () => {
+      await refetch();
+    }, [refetch]);
+
     // Table configuration with memoized values
     const tableConfig = useTableConfig({
       rows: rows as Row[],
@@ -141,6 +156,11 @@ export const DataTable = memo(
       setRowSelection,
       updateCell: { mutate: handleUpdateCell },
       updateTempCell,
+      state: {
+        columnVisibility,
+      },
+      onColumnVisibilityChange,
+      refetchData,
     });
 
     // Create table instance
@@ -172,16 +192,22 @@ export const DataTable = memo(
         {
           onSuccess: () => {
             virtualizer.measure();
-            // Scroll to the bottom to show the new row
+            // Scroll based on sort conditions
             if (tableContainerRef.current) {
-              tableContainerRef.current.scrollTop =
-                tableContainerRef.current.scrollHeight;
+              const scrollPosition =
+                sortConditions.length > 0
+                  ? sortConditions[0]?.order === "asc"
+                    ? 0
+                    : tableContainerRef.current.scrollHeight
+                  : tableContainerRef.current.scrollHeight;
+
+              tableContainerRef.current.scrollTop = scrollPosition;
             }
           },
         },
       );
       setShouldRefetchCount(true);
-    }, [addRow, tableId, incrementCount, virtualizer]);
+    }, [addRow, tableId, incrementCount, virtualizer, sortConditions]);
 
     const handleRenameColumn = (columnId: string, name: string) => {
       renameColumn.mutate({ columnId, name });
@@ -235,6 +261,8 @@ export const DataTable = memo(
                       searchQuery={searchQuery}
                       sortedColumns={sortedColumns}
                       filterConditions={filterConditions}
+                      columnVisibility={columnVisibility}
+                      onRefetch={handleRefetch}
                     />
                   </table>
                 </div>

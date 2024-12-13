@@ -129,4 +129,58 @@ export const viewRouter = createTRPCRouter({
         value: filter.value,
       }));
     }),
+  updateColumnOrder: publicProcedure
+    .input(
+      z.object({
+        viewId: z.string(),
+        columns: z.array(
+          z.object({
+            id: z.string(),
+            order: z.number(),
+          }),
+        ),
+      }),
+    )
+    .mutation(async ({ input }) => {
+      // First, delete all existing column orders for this view
+      await prisma.columnOrder.deleteMany({
+        where: {
+          viewId: input.viewId,
+        },
+      });
+
+      // Then create new column orders
+      await prisma.columnOrder.createMany({
+        data: input.columns.map((column) => ({
+          viewId: input.viewId,
+          columnId: column.id,
+          order: column.order,
+        })),
+      });
+
+      return { success: true };
+    }),
+  getColumnOrder: publicProcedure
+    .input(z.object({ viewId: z.string() }))
+    .query(async ({ input }) => {
+      return await prisma.columnOrder.findMany({
+        where: { viewId: input.viewId },
+        orderBy: { order: "asc" },
+      });
+    }),
+  updateColumnVisibility: publicProcedure
+    .input(
+      z.object({
+        viewId: z.string(),
+        visibility: z.record(z.boolean()),
+      }),
+    )
+    .mutation(async ({ input }) => {
+      return await prisma.view.update({
+        where: { id: input.viewId },
+        data: {
+          columnVisibility: JSON.stringify(input.visibility),
+        },
+      });
+    }),
 });

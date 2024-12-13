@@ -25,15 +25,17 @@ model User {
 }
 
 model View {
-  id        String   @id @default(cuid())
-  tableId   String
-  name      String
-  filters   Filter[]
-  sorts     Sort[]
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id              String   @id @default(cuid())
+  tableId         String
+  name            String
+  filters         Filter[]
+  sorts           Sort[]
+  columnVisibility Json?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 
-  table Table @relation("TableViews", fields: [tableId], references: [id], onDelete: Cascade)
+  table       Table         @relation("TableViews", fields: [tableId], references: [id], onDelete: Cascade)
+  ColumnOrder ColumnOrder[]
 
   @@index([tableId])
   @@index([id])
@@ -77,10 +79,11 @@ model Column {
   createdAt DateTime   @default(now())
   updatedAt DateTime   @updatedAt
 
-  table  Table    @relation(fields: [tableId], references: [id], onDelete: Cascade)
-  cells  Cell[]
-  Filter Filter[]
-  Sort   Sort[]
+  table       Table         @relation(fields: [tableId], references: [id], onDelete: Cascade)
+  cells       Cell[]
+  Filter      Filter[]
+  Sort        Sort[]
+  ColumnOrder ColumnOrder[]
 
   @@index([tableId])
   @@index([id])
@@ -222,4 +225,20 @@ enum FilterOperator {
 enum SortDirection {
   Ascending
   Descending
+}
+
+model ColumnOrder {
+  id        String   @id @default(cuid())
+  viewId    String
+  columnId  String
+  order     Int
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  view   View   @relation(fields: [viewId], references: [id], onDelete: Cascade)
+  column Column @relation(fields: [columnId], references: [id], onDelete: Cascade)
+
+  @@unique([viewId, columnId])
+  @@index([viewId])
+  @@index([columnId])
 }

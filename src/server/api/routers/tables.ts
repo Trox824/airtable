@@ -114,8 +114,8 @@ export const tablesRouter = createTRPCRouter({
               createdColumns.map((column) => ({
                 rowId: row.id,
                 columnId: column.id,
-                valueText: column.type === "Text" ? "" : null,
-                valueNumber: column.type === "Number" ? null : null,
+                valueText: null,
+                valueNumber: null,
               })),
             ),
           });

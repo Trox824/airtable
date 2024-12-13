@@ -45,55 +45,41 @@ export const rowsRouter = createTRPCRouter({
   create: publicProcedure
     .input(createRowInput)
     .mutation(async ({ ctx, input }): Promise<RowWithCells> => {
-      return await ctx.db.$transaction(
-        async (tx) => {
-          // 1. Get table with columns first
-          const table = await tx.table.findUnique({
-            where: { id: input.tableId },
-            include: { columns: true },
-          });
-
-          if (!table) {
-            throw new TRPCError({
-              code: "NOT_FOUND",
-              message: "Table not found",
+      try {
+        return await ctx.db.$transaction(
+          async (tx) => {
+            // 1. Get table with columns first
+            const table = await tx.table.findUnique({
+              where: { id: input.tableId },
+              include: { columns: true },
             });
-          }
 
-          if (table.columns.length === 0) {
-            throw new TRPCError({
-              code: "BAD_REQUEST",
-              message: "Table has no columns",
-            });
-          }
+            if (!table) {
+              throw new TRPCError({
+                code: "NOT_FOUND",
+                message: "Table not found",
+              });
+            }
 
-          // 2. Create row with cells in one transaction
-          const createdRow = await tx.row.create({
-            data: {
-              tableId: input.tableId,
-              cells: {
-                create: table.columns.map((column) => ({
-                  columnId: column.id,
-                  valueText: column.type === ColumnType.Text ? "" : null,
-                  valueNumber: column.type === ColumnType.Number ? null : null,
-                })),
-              },
-            },
-            include: {
-              cells: {
-                include: {
-                  column: {
-                    select: { type: true },
-                  },
+            if (table.columns.length === 0) {
+              throw new TRPCError({
+                code: "BAD_REQUEST",
+                message: "Table has no columns",
+              });
+            }
+
+            // 2. Create row with cells in one transaction
+            const createdRow = await tx.row.create({
+              data: {
+                tableId: input.tableId,
+                cells: {
+                  create: table.columns.map((column) => ({
+                    columnId: column.id,
+                    valueText: null,
+                    valueNumber: null,
+                  })),
                 },
               },
-            },
-          });
-
-          // 3. If sort conditions exist, fetch the row again with proper sorting
-          if (input.sortConditions?.length) {
-            const sortedRow = await tx.row.findUnique({
-              where: { id: createdRow.id },
               include: {
                 cells: {
                   include: {
@@ -105,22 +91,70 @@ export const rowsRouter = createTRPCRouter({
               },
             });
 
-            if (!sortedRow) {
-              throw new TRPCError({
-                code: "INTERNAL_SERVER_ERROR",
-                message: "Failed to create row",
+            // If sort conditions exist, initialize sorted columns with appropriate values
+            if (input.sortConditions?.length) {
+              const cellUpdates = input.sortConditions.map(async (sort) => {
+                const column = table.columns.find(
+                  (col) => col.id === sort.columnId,
+                );
+                if (!column) return;
+
+                // Find the existing cell for this column
+                const cell = createdRow.cells.find(
+                  (c) => c.columnId === sort.columnId,
+                );
+                if (!cell) return;
+                await tx.cell.update({
+                  where: { id: cell.id },
+                  data: {
+                    valueText: column.type === ColumnType.Text ? null : null,
+                    valueNumber:
+                      column.type === ColumnType.Number ? null : null,
+                  },
+                });
               });
+
+              await Promise.all(cellUpdates);
+
+              // Fetch the updated row
+              const sortedRow = await tx.row.findUnique({
+                where: { id: createdRow.id },
+                include: {
+                  cells: {
+                    include: {
+                      column: {
+                        select: { type: true },
+                      },
+                    },
+                  },
+                },
+              });
+
+              if (!sortedRow) {
+                throw new TRPCError({
+                  code: "INTERNAL_SERVER_ERROR",
+                  message: "Failed to create row",
+                });
+              }
+
+              return sortedRow;
             }
 
-            return sortedRow;
-          }
-
-          return createdRow;
-        },
-        {
-          timeout: 10000, // 10 second timeout
-        },
-      );
+            return createdRow;
+          },
+          {
+            timeout: 30000, // Increased from 10s to 30s
+            maxWait: 35000, // Add maxWait to ensure we don't wait too long for a transaction slot
+          },
+        );
+      } catch (error) {
+        console.error("Row creation failed:", error);
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message:
+            error instanceof Error ? error.message : "Failed to create row",
+        });
+      }
     }),
 
   // Get total count of rows in a table
@@ -241,25 +275,40 @@ export const rowsRouter = createTRPCRouter({
         paramIndex++;
       }
 
-      // Handle sorting
+      // Fetch column types first for proper sort handling
+      const columns = await ctx.db.column.findMany({
+        where: { tableId },
+        select: { id: true, type: true },
+      });
+
+      // Handle sorting with type-aware conditions
       const joinClauses: string[] = [];
       const orderByConditions: string[] = [];
 
       if (sortConditions && sortConditions.length > 0) {
         sortConditions.forEach((sort, index) => {
           const sortAlias = `s${index}`;
+          const column = columns.find((col) => col.id === sort.columnId);
+
           joinClauses.push(`
-          LEFT JOIN "Cell" ${sortAlias}
-            ON ${sortAlias}."rowId" = r.id AND ${sortAlias}."columnId" = $${paramIndex}
-        `);
+            LEFT JOIN "Cell" ${sortAlias}
+              ON ${sortAlias}."rowId" = r.id AND ${sortAlias}."columnId" = $${paramIndex}
+          `);
           params.push(sort.columnId);
-          orderByConditions.push(`
-          CASE 
-            WHEN ${sortAlias}."valueNumber" IS NOT NULL 
-            THEN CAST(${sortAlias}."valueNumber" AS TEXT)
-            ELSE COALESCE(${sortAlias}."valueText", '')
-          END ${sort.order.toUpperCase()}
-        `);
+
+          // Use appropriate sorting based on column type
+          if (column?.type === ColumnType.Number) {
+            orderByConditions.push(
+              `MAX(${sortAlias}."valueNumber") ${sort.order.toUpperCase()} ${
+                sort.order === "asc" ? "NULLS FIRST" : "NULLS LAST"
+              }`,
+            );
+          } else {
+            orderByConditions.push(
+              `COALESCE(MAX(${sortAlias}."valueText"), '') ${sort.order.toUpperCase()}`,
+            );
+          }
+
           paramIndex++;
         });
       } else {
@@ -286,15 +335,15 @@ export const rowsRouter = createTRPCRouter({
             'columnId', c."columnId",
             'rowId', c."rowId"
           )
-        ), '[]') AS cells
+        ) FILTER (WHERE c.id IS NOT NULL), '[]') AS cells
       FROM "Row" r
       LEFT JOIN "Cell" c ON c."rowId" = r.id
       ${joinClauses.join(" ")}
       ${whereClause}
       GROUP BY r.id, r."tableId"
-      ${orderByClause}
+      ${orderByConditions.length ? `ORDER BY ${orderByConditions.join(", ")}` : "ORDER BY r.id ASC"}
       LIMIT $${limitParam}::integer
-    `;
+      `;
 
       try {
         const rows: (Row & { cells: PrismaCell[] })[] =

@@ -52,13 +52,11 @@ export function SortModal({
   ) => {
     const newConditions = sortConditions.map((condition, i) => {
       if (i === index) {
-        const selectedColumn = columns?.find(
-          (col) => col.id === condition.columnId,
-        );
-        const isNumberColumn = selectedColumn?.type === "Number";
+        const normalizedOrder =
+          order === "0-9" ? "asc" : order === "9-0" ? "desc" : order;
         return {
           ...condition,
-          order: isNumberColumn ? (order === "asc" ? "0-9" : "9-0") : order,
+          order: normalizedOrder,
         };
       }
       return condition;
@@ -71,10 +69,7 @@ export function SortModal({
       viewId,
       sorts: newConditions.map((condition) => ({
         columnId: condition.columnId,
-        direction:
-          condition.order === "asc" || condition.order === "0-9"
-            ? "Ascending"
-            : "Descending",
+        direction: condition.order === "asc" ? "Ascending" : "Descending",
       })),
     });
   };
@@ -239,7 +234,13 @@ export function SortModal({
               </div>
               <select
                 className="flex w-28 items-center justify-between gap-x-2 rounded-sm border p-2 hover:bg-gray-100"
-                value={condition.order}
+                value={
+                  selectedColumn?.type === "Number"
+                    ? condition.order === "asc"
+                      ? "0-9"
+                      : "9-0"
+                    : condition.order
+                }
                 onChange={(e) =>
                   handleSortOrderChange(
                     index,
@@ -247,12 +248,17 @@ export function SortModal({
                   )
                 }
               >
-                <option value="asc">
-                  {selectedColumn?.type === "Number" ? "0-9" : "A-Z"}
-                </option>
-                <option value="desc">
-                  {selectedColumn?.type === "Number" ? "9-0" : "Z-A"}
-                </option>
+                {selectedColumn?.type === "Number" ? (
+                  <>
+                    <option value="0-9">0-9</option>
+                    <option value="9-0">9-0</option>
+                  </>
+                ) : (
+                  <>
+                    <option value="asc">A-Z</option>
+                    <option value="desc">Z-A</option>
+                  </>
+                )}
               </select>
               <button
                 className="flex items-center gap-x-2 rounded-sm p-2 hover:bg-gray-100"

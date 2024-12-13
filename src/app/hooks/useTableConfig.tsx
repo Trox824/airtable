@@ -1,7 +1,12 @@
 // src/app/hook/useTableConfig.ts
 
 import { useMemo, useCallback } from "react";
-import { getCoreRowModel, type ColumnDef } from "@tanstack/react-table";
+import {
+  getCoreRowModel,
+  type ColumnDef,
+  type VisibilityState,
+  type OnChangeFn,
+} from "@tanstack/react-table";
 import { type Row, type UpdateCellParams } from "../Types/types";
 
 interface TableConfigProps {
@@ -15,6 +20,11 @@ interface TableConfigProps {
     mutate: (params: UpdateCellParams) => void;
   };
   updateTempCell: (params: UpdateCellParams) => void;
+  state: {
+    columnVisibility: VisibilityState;
+  };
+  onColumnVisibilityChange: OnChangeFn<VisibilityState>;
+  refetchData: () => Promise<void>;
 }
 
 export const useTableConfig = ({
@@ -26,7 +36,18 @@ export const useTableConfig = ({
   setRowSelection,
   updateCell,
   updateTempCell,
+  state: { columnVisibility },
+  onColumnVisibilityChange,
+  refetchData,
 }: TableConfigProps) => {
+  // Handle column visibility changes
+  const handleColumnVisibilityChange: OnChangeFn<VisibilityState> = useCallback(
+    (updaterOrValue) => {
+      onColumnVisibilityChange(updaterOrValue);
+    },
+    [onColumnVisibilityChange],
+  );
+
   // Handle column sizing changes
   const handleColumnSizingChange = useCallback(
     (
@@ -61,7 +82,7 @@ export const useTableConfig = ({
 
   // Handle updating cell data
   const handleUpdateData = useCallback(
-    (rowIndex: number, columnId: string, value: unknown) => {
+    async (rowIndex: number, columnId: string, value: unknown) => {
       const row = rows[rowIndex];
       if (!row) {
         console.error("Row not found", { rowIndex });
@@ -103,10 +124,14 @@ export const useTableConfig = ({
             : null,
       };
 
-      if (cell.id.startsWith("temp_")) {
-        updateTempCell(updateParams);
-      } else {
-        updateCell.mutate(updateParams);
+      try {
+        if (cell.id.startsWith("temp_")) {
+          updateTempCell(updateParams);
+        } else {
+          updateCell.mutate(updateParams);
+        }
+      } catch (error) {
+        console.error("Error updating cell:", error);
       }
     },
     [rows, tableColumns, updateCell, updateTempCell],
@@ -119,6 +144,7 @@ export const useTableConfig = ({
       state: {
         rowSelection,
         columnSizing,
+        columnVisibility,
       },
       onColumnSizingChange: handleColumnSizingChange,
       columnResizeMode: "onChange" as const,
@@ -129,6 +155,7 @@ export const useTableConfig = ({
       meta: {
         updateData: handleUpdateData,
       },
+      onColumnVisibilityChange: handleColumnVisibilityChange,
     }),
     [
       rows,
@@ -138,6 +165,8 @@ export const useTableConfig = ({
       handleColumnSizingChange,
       handleRowSelectionChange,
       handleUpdateData,
+      columnVisibility,
+      handleColumnVisibilityChange,
     ],
   );
 };

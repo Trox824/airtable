@@ -1,5 +1,11 @@
 "use client";
 import { useState, useRef, useEffect } from "react";
+import {
+  DragDropContext,
+  Droppable,
+  Draggable,
+  DropResult,
+} from "react-beautiful-dnd";
 import { SortModal } from "./SortModal";
 import FilterModal from "./FilterModal";
 import { ColumnType } from "@prisma/client";
@@ -9,7 +15,9 @@ import {
   SortedColumn,
 } from "../../../Types/types";
 import { type SortCondition } from "../../../Types/types";
-
+import { HideModal } from "./HideModal";
+import { type VisibilityState, type OnChangeFn } from "@tanstack/react-table";
+import { api } from "~/trpc/react";
 interface ToolbarProps {
   handleSearch: (query: string) => void;
   openViewBar: boolean;
@@ -26,6 +34,10 @@ interface ToolbarProps {
   setSortedColumns: (columns: SortedColumn[]) => void;
   filterConditions: FilterCondition[];
   setFilterConditions: React.Dispatch<React.SetStateAction<FilterCondition[]>>;
+
+  columnVisibility: VisibilityState;
+  onColumnVisibilityChange: OnChangeFn<VisibilityState>;
+  setColumns: (columns: SimpleColumn[]) => void;
 }
 
 export default function Toolbar({
@@ -44,11 +56,19 @@ export default function Toolbar({
   setSortedColumns,
   filterConditions,
   setFilterConditions,
+
+  columnVisibility,
+  onColumnVisibilityChange,
+  setColumns,
 }: ToolbarProps) {
   const [isSearchVisible, setIsSearchVisible] = useState(false);
   const [searchValue, setSearchValue] = useState("");
   const sortButtonRef = useRef<HTMLDivElement>(null);
   const filterButtonRef = useRef<HTMLDivElement>(null);
+  const [openHideModal, setOpenHideModal] = useState(false);
+  const hideButtonRef = useRef<HTMLDivElement>(null);
+
+  const updateColumnOrderMutation = api.view.updateColumnOrder.useMutation({});
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -66,13 +86,27 @@ export default function Toolbar({
       ) {
         setOpenFilterModal(false);
       }
+      if (
+        hideButtonRef.current &&
+        !hideButtonRef.current.contains(event.target as Node) &&
+        openHideModal
+      ) {
+        setOpenHideModal(false);
+      }
     }
 
     document.addEventListener("mousedown", handleClickOutside);
     return () => {
       document.removeEventListener("mousedown", handleClickOutside);
     };
-  }, [openSortModal, setOpenSortModal, openFilterModal, setOpenFilterModal]);
+  }, [
+    openSortModal,
+    setOpenSortModal,
+    openFilterModal,
+    setOpenFilterModal,
+    openHideModal,
+    setOpenHideModal,
+  ]);
 
   const toggleSearch = () => {
     setIsSearchVisible(!isSearchVisible);
@@ -90,6 +124,44 @@ export default function Toolbar({
 
   const toggleViewBar = () => {
     setOpenViewBar(!openViewBar);
+  };
+
+  const handleToggleVisibility = (
+    columnId: string,
+    newVisibility?: Record<string, boolean>,
+  ) => {
+    if (columnId === "__ALL__" && newVisibility) {
+      onColumnVisibilityChange(newVisibility);
+    } else {
+      onColumnVisibilityChange((prev) => ({
+        ...prev,
+        [columnId]: !prev[columnId],
+      }));
+    }
+  };
+
+  const handleColumnReorder = (startIndex: number, endIndex: number) => {
+    if (!columns) return;
+
+    const newColumns = [...columns];
+    const [removed] = newColumns.splice(startIndex, 1);
+    if (removed) {
+      newColumns.splice(endIndex, 0, removed);
+    }
+
+    // Update local state
+    setColumns(newColumns);
+
+    // Save to database with view-specific order
+    const columnsWithOrder = newColumns.map((col, index) => ({
+      id: col.id,
+      order: index,
+    }));
+
+    updateColumnOrderMutation.mutate({
+      viewId,
+      columns: columnsWithOrder,
+    });
   };
 
   return (
@@ -143,25 +215,56 @@ export default function Toolbar({
           <div>Grid View</div>
         </button>
 
-        <div className="flex cursor-pointer items-center gap-x-2 rounded-sm p-2 hover:bg-gray-200/60">
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            width="16"
-            height="16"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            className="lucide lucide-eye-off"
+        <div className="relative" ref={hideButtonRef}>
+          <button
+            onClick={() => setOpenHideModal(true)}
+            className={`flex cursor-pointer items-center gap-x-2 rounded-sm p-2 ${
+              Object.values(columnVisibility).includes(false)
+                ? "bg-purple-300/40 hover:bg-purple-300/60"
+                : "hover:bg-gray-200/60"
+            }`}
           >
-            <path d="M10.733 5.076a10.744 10.744 0 0 1 11.205 6.575 1 1 0 0 1 0 .696 10.747 10.747 0 0 1-1.444 2.49"></path>
-            <path d="M14.084 14.158a3 3 0 0 1-4.242-4.242"></path>
-            <path d="M17.479 17.499a10.75 10.75 0 0 1-15.417-5.151 1 1 0 0 1 0-.696 10.75 10.75 0 0 1 4.446-5.143"></path>
-            <path d="m2 2 20 20"></path>
-          </svg>
-          <div>Hide</div>
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className={`lucide lucide-eye-off ${
+                Object.values(columnVisibility).includes(false)
+                  ? "text-purple-600"
+                  : ""
+              }`}
+            >
+              <path d="M9.88 9.88a3 3 0 1 0 4.24 4.24"></path>
+              <path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68"></path>
+              <path d="M6.61 6.61A13.526 13.526 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61"></path>
+              <line x1="2" y1="2" x2="22" y2="22"></line>
+            </svg>
+            <div
+              className={
+                Object.values(columnVisibility).includes(false)
+                  ? "text-purple-600"
+                  : ""
+              }
+            >
+              Hide
+            </div>
+          </button>
+
+          {openHideModal && (
+            <HideModal
+              viewId={viewId}
+              columns={columns}
+              columnVisibility={columnVisibility}
+              onToggleVisibility={handleToggleVisibility}
+              onColumnReorder={handleColumnReorder}
+            />
+          )}
         </div>
         <button className="flex cursor-pointer items-center gap-x-2 rounded-sm p-2 hover:bg-gray-200/60">
           <svg

@@ -60,14 +60,15 @@ export function useTableQuery(
         getNextPageParam,
         getPreviousPageParam,
         refetchOnWindowFocus: false,
-        staleTime: 30000,
+        staleTime: 0,
         gcTime: 5 * 60 * 1000,
-        refetchOnMount: false,
+        refetchOnMount: true,
         retry: 1,
-        refetchInterval: false as const,
+        refetchInterval: 0,
         refetchOnReconnect: false,
         queryKey: ["rows", queryParams],
         initialPageParam: undefined,
+        networkMode: "always" as const,
       }) satisfies UseInfiniteQueryOptions<
         PaginatedResponse,
         PaginatedResponse,
@@ -77,5 +78,14 @@ export function useTableQuery(
     [getNextPageParam, getPreviousPageParam],
   );
 
-  return api.rows.getByTableId.useInfiniteQuery(queryParams, queryOptions);
+  const query = api.rows.getByTableId.useInfiniteQuery(
+    queryParams,
+    queryOptions,
+  );
+
+  const refetchData = useCallback(async () => {
+    await query.refetch();
+  }, [query]);
+
+  return { ...query, refetchData };
 }

@@ -51,6 +51,8 @@ export function TableHeader({
       {table.getHeaderGroups().map((headerGroup) => (
         <tr key={headerGroup.id} className="flex h-8">
           {headerGroup.headers.map((header) => {
+            const columnId = header.column.id;
+
             return (
               <th
                 key={header.id}

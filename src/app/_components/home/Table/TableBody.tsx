@@ -2,7 +2,6 @@ import { useCallback, memo, useEffect, useState } from "react";
 import {
   CellContext,
   type ColumnDef,
-  flexRender,
   type Table,
   type Cell,
 } from "@tanstack/react-table";
@@ -19,6 +18,8 @@ interface TableBodyProps {
   virtualizer: ReturnType<typeof useVirtualizer>;
   sortedColumns: SortedColumn[];
   filterConditions: FilterCondition[];
+  columnVisibility: Record<string, boolean>;
+  onRefetch?: () => Promise<void>;
 }
 
 const MemoizedCellRenderer = memo(CellRenderer);
@@ -32,6 +33,8 @@ export const TableBody = memo(function TableBody({
   virtualizer,
   sortedColumns,
   filterConditions,
+  columnVisibility,
+  onRefetch,
 }: TableBodyProps) {
   const [mounted, setMounted] = useState(false);
 
@@ -64,10 +67,11 @@ export const TableBody = memo(function TableBody({
           setEditing={setEditing}
           meta={table.options.meta}
           searchQuery={searchQuery}
+          onCellUpdate={onRefetch}
         />
       );
     },
-    [searchQuery, setEditing, table.options.meta, mounted],
+    [searchQuery, setEditing, table.options.meta, mounted, onRefetch],
   );
 
   const virtualRows = virtualizer.getVirtualItems();
@@ -96,6 +100,11 @@ export const TableBody = memo(function TableBody({
     },
     [filterConditions],
   );
+
+  const handleAddRowWithLogging = () => {
+    handleAddRow();
+    console.log(allRows);
+  };
 
   return (
     <tbody>
@@ -131,6 +140,8 @@ export const TableBody = memo(function TableBody({
                 const value = cell.getValue();
                 const isSorted = isColumnSorted(cell.column.id);
                 const isFiltered = isColumnFiltered(cell.column.id);
+                const columnId = cell.column.id;
+                if (columnVisibility[columnId] === false) return null;
 
                 return (
                   <td
@@ -171,7 +182,7 @@ export const TableBody = memo(function TableBody({
 
       <tr
         className="flex cursor-pointer border-b-[0.8px] border-r-[0.8px] bg-white hover:bg-[#f8f8f8]"
-        onClick={handleAddRow}
+        onClick={handleAddRowWithLogging}
         style={{
           width: table.getCenterTotalSize(),
           backgroundColor: "white",
