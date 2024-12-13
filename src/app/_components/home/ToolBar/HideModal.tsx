@@ -27,9 +27,13 @@ interface SwitchProps {
 export const Switch: React.FC<SwitchProps> = ({ checked, onCheckedChange }) => {
   return (
     <button
+      type="button"
       role="switch"
       aria-checked={checked}
-      onClick={() => onCheckedChange(!checked)}
+      onClick={(e) => {
+        e.preventDefault();
+        onCheckedChange(checked);
+      }}
       className={`relative inline-flex h-2.5 w-4 items-center rounded-full transition-colors ${
         checked ? "bg-green-600" : "bg-gray-200"
       }`}
@@ -51,7 +55,12 @@ export const HideModal: React.FC<HideModalProps> = ({
   onColumnReorder,
 }) => {
   const [searchQuery, setSearchQuery] = useState("");
-  const updateColumnVisibility = api.view.updateColumnVisibility.useMutation();
+  const utils = api.useUtils();
+  const updateColumnVisibility = api.view.updateColumnVisibility.useMutation({
+    onSuccess: () => {
+      void utils.view.getColumnVisibility.invalidate({ viewId });
+    },
+  });
 
   if (!columns) return null;
 
@@ -59,22 +68,20 @@ export const HideModal: React.FC<HideModalProps> = ({
     column.name.toLowerCase().includes(searchQuery.toLowerCase()),
   );
 
-  const handleHideAll = () => {
+  const handleHideAll = async () => {
     const newVisibility: Record<string, boolean> = {};
     columns?.forEach((column) => {
       newVisibility[column.id] = false;
     });
-    // Update all columns at once using onColumnVisibilityChange
-    onToggleVisibility("__ALL__", newVisibility);
+    await handleToggleVisibility("__ALL__", newVisibility);
   };
 
-  const handleShowAll = () => {
+  const handleShowAll = async () => {
     const newVisibility: Record<string, boolean> = {};
     columns?.forEach((column) => {
       newVisibility[column.id] = true;
     });
-    // Update all columns at once using onColumnVisibilityChange
-    onToggleVisibility("__ALL__", newVisibility);
+    await handleToggleVisibility("__ALL__", newVisibility);
   };
 
   const handleDragEnd = (result: DropResult) => {
@@ -98,8 +105,8 @@ export const HideModal: React.FC<HideModalProps> = ({
       [columnId]: !columnVisibility[columnId],
     };
 
-    // Update local state
-    onToggleVisibility(columnId, newVisibility);
+    // Update local state first
+    onToggleVisibility(columnId, updatedVisibility);
 
     // Save to database
     try {
@@ -109,7 +116,8 @@ export const HideModal: React.FC<HideModalProps> = ({
       });
     } catch (error) {
       console.error("Failed to save column visibility:", error);
-      // Optionally revert local state on error
+      // Revert local state on error
+      onToggleVisibility(columnId, columnVisibility);
     }
   };
 

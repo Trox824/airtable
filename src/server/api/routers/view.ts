@@ -142,23 +142,55 @@ export const viewRouter = createTRPCRouter({
       }),
     )
     .mutation(async ({ input }) => {
-      // First, delete all existing column orders for this view
-      await prisma.columnOrder.deleteMany({
-        where: {
-          viewId: input.viewId,
-        },
+      // First, verify that the view exists
+      const view = await prisma.view.findUnique({
+        where: { id: input.viewId },
       });
 
-      // Then create new column orders
-      await prisma.columnOrder.createMany({
-        data: input.columns.map((column) => ({
-          viewId: input.viewId,
-          columnId: column.id,
-          order: column.order,
-        })),
-      });
+      if (!view) {
+        throw new Error("View not found");
+      }
 
-      return { success: true };
+      // Use a transaction to ensure data consistency
+      return await prisma.$transaction(async (tx) => {
+        // Delete existing column orders
+        await tx.columnOrder.deleteMany({
+          where: {
+            viewId: input.viewId,
+          },
+        });
+
+        // Verify that all columns exist before creating orders
+        const columns = await tx.column.findMany({
+          where: {
+            id: {
+              in: input.columns.map((col) => col.id),
+            },
+          },
+          select: { id: true },
+        });
+
+        const validColumnIds = new Set(columns.map((col) => col.id));
+        const validColumns = input.columns.filter((col) =>
+          validColumnIds.has(col.id),
+        );
+
+        // Create new column orders only for valid columns
+        if (validColumns.length > 0) {
+          await tx.columnOrder.createMany({
+            data: validColumns.map((column) => ({
+              viewId: input.viewId,
+              columnId: column.id,
+              order: column.order,
+            })),
+          });
+        }
+
+        return {
+          success: true,
+          updatedColumns: validColumns.length,
+        };
+      });
     }),
   getColumnOrder: publicProcedure
     .input(z.object({ viewId: z.string() }))
@@ -181,6 +213,14 @@ export const viewRouter = createTRPCRouter({
         data: {
           columnVisibility: JSON.stringify(input.visibility),
         },
+      });
+    }),
+  getColumnVisibility: publicProcedure
+    .input(z.object({ viewId: z.string() }))
+    .query(async ({ input }) => {
+      return await prisma.view.findUnique({
+        where: { id: input.viewId },
+        select: { columnVisibility: true },
       });
     }),
 });

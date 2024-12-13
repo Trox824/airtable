@@ -34,6 +34,15 @@ export default function TablePage() {
   const { data: columnOrder } = api.view.getColumnOrder.useQuery({
     viewId: viewId as string,
   });
+  const { data: initialVisibility } = api.view.getColumnVisibility.useQuery(
+    { viewId: viewId as string },
+    {
+      // Ensure the query stays fresh
+      staleTime: 0,
+      // Optional: refetch on window focus
+      refetchOnWindowFocus: true,
+    },
+  );
 
   // 4. UI state
   const [openViewBar, setOpenViewBar] = useState(false);
@@ -50,6 +59,9 @@ export default function TablePage() {
   );
   const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({});
   const [localColumns, setLocalColumns] = useState<SimpleColumn[]>([]);
+
+  // Add utils for invalidation
+  const utils = api.useUtils();
 
   // 6. Effects
   useEffect(() => {
@@ -87,6 +99,19 @@ export default function TablePage() {
     }
   }, [columns, columnOrder]);
 
+  useEffect(() => {
+    if (initialVisibility?.columnVisibility) {
+      try {
+        const parsedVisibility = JSON.parse(
+          initialVisibility.columnVisibility as string,
+        );
+        setColumnVisibility(parsedVisibility);
+      } catch (error) {
+        console.error("Failed to parse column visibility:", error);
+      }
+    }
+  }, []);
+
   // 7. Memoized values
   const memoizedColumns = useMemo(() => localColumns, [localColumns]);
   const memoizedTableId = useMemo(() => tableId as string, [tableId]);
@@ -108,13 +133,14 @@ export default function TablePage() {
 
   const handleColumnVisibilityChange: OnChangeFn<VisibilityState> = useCallback(
     (updaterOrValue) => {
-      setColumnVisibility(
+      const newVisibility =
         typeof updaterOrValue === "function"
           ? updaterOrValue(columnVisibility)
-          : updaterOrValue,
-      );
+          : updaterOrValue;
+
+      setColumnVisibility(newVisibility);
     },
-    [columnVisibility],
+    [],
   );
 
   // 9. Render

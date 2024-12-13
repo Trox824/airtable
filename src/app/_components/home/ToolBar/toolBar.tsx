@@ -70,6 +70,35 @@ export default function Toolbar({
 
   const updateColumnOrderMutation = api.view.updateColumnOrder.useMutation({});
 
+  // Add visibility query and mutation
+  const utils = api.useUtils();
+  const { data: initialVisibility } = api.view.getColumnVisibility.useQuery(
+    { viewId },
+    {
+      staleTime: 0,
+      refetchOnWindowFocus: true,
+    },
+  );
+
+  // Effect to initialize column visibility
+  useEffect(() => {
+    if (initialVisibility?.columnVisibility) {
+      try {
+        const parsedVisibility = JSON.parse(
+          initialVisibility.columnVisibility as string,
+        );
+        onColumnVisibilityChange(parsedVisibility);
+      } catch (error) {
+        console.error("Failed to parse column visibility:", error);
+      }
+    }
+  }, [initialVisibility, onColumnVisibilityChange]);
+
+  // Calculate if any columns are hidden
+  const hasHiddenColumns = Object.values(columnVisibility).some(
+    (isVisible) => isVisible === false,
+  );
+
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
       if (
@@ -219,7 +248,7 @@ export default function Toolbar({
           <button
             onClick={() => setOpenHideModal(true)}
             className={`flex cursor-pointer items-center gap-x-2 rounded-sm p-2 ${
-              Object.values(columnVisibility).includes(false)
+              hasHiddenColumns
                 ? "bg-purple-300/40 hover:bg-purple-300/60"
                 : "hover:bg-gray-200/60"
             }`}
@@ -235,9 +264,7 @@ export default function Toolbar({
               strokeLinecap="round"
               strokeLinejoin="round"
               className={`lucide lucide-eye-off ${
-                Object.values(columnVisibility).includes(false)
-                  ? "text-purple-600"
-                  : ""
+                hasHiddenColumns ? "text-purple-600" : ""
               }`}
             >
               <path d="M9.88 9.88a3 3 0 1 0 4.24 4.24"></path>
@@ -245,13 +272,7 @@ export default function Toolbar({
               <path d="M6.61 6.61A13.526 13.526 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61"></path>
               <line x1="2" y1="2" x2="22" y2="22"></line>
             </svg>
-            <div
-              className={
-                Object.values(columnVisibility).includes(false)
-                  ? "text-purple-600"
-                  : ""
-              }
-            >
+            <div className={hasHiddenColumns ? "text-purple-600" : ""}>
               Hide
             </div>
           </button>
