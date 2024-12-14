@@ -344,6 +344,7 @@ export const tablesRouter = createTRPCRouter({
       z.object({
         baseId: z.string(),
         name: z.string().min(1),
+        rowCount: z.number().min(1).max(30000).default(1000),
       }),
     )
     .mutation(async ({ ctx, input }) => {
@@ -402,9 +403,9 @@ export const tablesRouter = createTRPCRouter({
             orderBy: { createdAt: "asc" },
           });
 
-          // Create rows in smaller batches
+          // Use the input.rowCount instead of hardcoded TOTAL_ROWS
           const BATCH_SIZE = 100;
-          const TOTAL_ROWS = 10000;
+          const TOTAL_ROWS = input.rowCount;
 
           for (let i = 0; i < TOTAL_ROWS; i += BATCH_SIZE) {
             await tx.row.createMany({

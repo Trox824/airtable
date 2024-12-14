@@ -176,10 +176,10 @@ export const DataTable = memo(
       void fetchNextPage();
     }, [fetchNextPage]);
 
-    // Move virtualizer declaration before its usage
+    // Modify the virtualizer declaration to conditionally use different row counts
     const virtualizer = useTableVirtualizer(
       tableContainerRef,
-      totalRowCount,
+      searchQuery ? rows.length : totalRowCount,
       rows.length,
       hasNextPage,
       isFetchingNextPage,

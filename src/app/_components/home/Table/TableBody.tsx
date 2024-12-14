@@ -103,7 +103,6 @@ export const TableBody = memo(function TableBody({
 
   const handleAddRowWithLogging = () => {
     handleAddRow();
-    console.log(allRows);
   };
 
   return (

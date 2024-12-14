@@ -74,7 +74,6 @@ export function useAddRowMutation(
         },
 
         (oldData) => {
-          console.log("mappedSortConditions", mappedSortConditions);
           if (!oldData) {
             console.log(
               "No oldData found, creating new data with optimistic row.",
@@ -87,26 +86,16 @@ export function useAddRowMutation(
 
           const newPages = [...oldData.pages];
           if (newPages[0]) {
-            console.log("newPages[0] items before adding:", newPages[0].items);
             newPages[0] = {
               ...newPages[0],
               items: [...newPages[0].items, optimisticRow],
             };
-            console.log(
-              "newPages[0] items after adding optimistic row:",
-              newPages[0].items,
-            );
 
             if (sortConditions.length > 0) {
-              console.log("Sort conditions:", sortConditions);
               const sortedItems = sortRowsByConditions(
                 newPages[0].items,
                 sortConditions,
                 columns,
-              );
-              console.log(
-                "Sorted items after adding optimistic row:",
-                sortedItems,
               );
 
               newPages[0] = {
@@ -121,18 +110,11 @@ export function useAddRowMutation(
             pages: newPages,
             pageParams: oldData.pageParams,
           };
-          console.log("Resulting data after sorting:", resultData);
+
           return resultData;
         },
       );
-      const haha = utils.rows.getByTableId.getInfiniteData({
-        tableId,
-        limit: 500,
-        searchQuery,
-        sortConditions: mappedSortConditions,
-        filterConditions,
-      });
-      console.log(haha);
+
       return { previousData, optimisticRow };
     },
 

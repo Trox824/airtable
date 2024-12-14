@@ -28,11 +28,14 @@ export function useAddColumnMutation(
       name: string;
       type: ColumnType;
     }) => {
+      console.log("Starting onMutate with newColumn:", newColumn);
       setIsTableCreating(true);
       await utils.columns.getByTableId.cancel({ tableId });
       const previousColumns = utils.columns.getByTableId.getData({ tableId });
+      console.log("Previous columns:", previousColumns);
 
       const tempColumnId = `temp_${cuid()}`;
+      console.log("Generated temp column ID:", tempColumnId);
 
       const existingRows = utils.rows.getByTableId.getInfiniteData({
         tableId,
@@ -41,6 +44,7 @@ export function useAddColumnMutation(
         sortConditions: mappedSortConditions,
         filterConditions,
       });
+      console.log("Existing rows:", existingRows);
 
       existingRows?.pages.forEach((page) => {
         page.items.forEach((row) => {
@@ -58,6 +62,7 @@ export function useAddColumnMutation(
             createdAt: new Date(),
             updatedAt: new Date(),
           };
+          console.log("Created temp cell for row:", row.id, tempCell);
 
           utils.rows.getByTableId.setInfiniteData(
             {
@@ -67,17 +72,21 @@ export function useAddColumnMutation(
               sortConditions: mappedSortConditions,
               filterConditions,
             },
-            (oldData) => ({
-              ...oldData!,
-              pages: oldData!.pages.map((page) => ({
-                ...page,
-                items: page.items.map((item) =>
-                  item.id === row.id
-                    ? { ...item, cells: [...item.cells, tempCell] }
-                    : item,
-                ),
-              })),
-            }),
+            (oldData) => {
+              const updatedData = {
+                ...oldData!,
+                pages: oldData!.pages.map((page) => ({
+                  ...page,
+                  items: page.items.map((item) =>
+                    item.id === row.id
+                      ? { ...item, cells: [...item.cells, tempCell] }
+                      : item,
+                  ),
+                })),
+              };
+              console.log("Updated cache data for row:", row.id, updatedData);
+              return updatedData;
+            },
           );
         });
       });
@@ -87,16 +96,20 @@ export function useAddColumnMutation(
         name: newColumn.name,
         type: newColumn.type,
       };
+      console.log("Created optimistic column:", optimisticColumn);
 
-      utils.columns.getByTableId.setData({ tableId }, (oldColumns) => [
-        ...(oldColumns ?? []),
-        optimisticColumn,
-      ]);
+      utils.columns.getByTableId.setData({ tableId }, (oldColumns) => {
+        const updatedColumns = [...(oldColumns ?? []), optimisticColumn];
+        console.log("Updated columns cache:", updatedColumns);
+        return updatedColumns;
+      });
 
       return { previousColumns, tempColumnId };
     },
 
     onSuccess: async (newColumn, variables, context) => {
+      console.log("onSuccess started with new column:", newColumn);
+      console.log("Context:", context);
       const { tempColumnId } = context;
 
       const currentCacheData = utils.rows.getByTableId.getInfiniteData({
@@ -106,6 +119,7 @@ export function useAddColumnMutation(
         sortConditions: mappedSortConditions,
         filterConditions,
       });
+      console.log("Current cache data:", currentCacheData);
 
       const tempCellValues = new Map<string, TempCellValues>();
       currentCacheData?.pages.forEach((page) => {
@@ -143,9 +157,54 @@ export function useAddColumnMutation(
         filterConditions,
       });
 
-      if (tempColumnId) {
+      utils.rows.getByTableId.setInfiniteData(
+        {
+          tableId,
+          limit: 500,
+          searchQuery,
+          sortConditions: mappedSortConditions,
+          filterConditions,
+        },
+        (oldData) => {
+          if (!oldData) return oldData;
+          return {
+            ...oldData,
+            pages: oldData.pages.map((page) => ({
+              ...page,
+              items: page.items.map((row) => {
+                const tempValues = tempCellValues.get(row.id);
+                if (!tempValues) return row;
+
+                return {
+                  ...row,
+                  cells: row.cells.map((cell) => {
+                    if (cell.columnId === newColumn.id) {
+                      return {
+                        ...cell,
+                        valueText: tempValues.valueText,
+                        valueNumber: tempValues.valueNumber,
+                      };
+                    }
+                    return cell;
+                  }),
+                };
+              }),
+            })),
+          };
+        },
+      );
+
+      const cachedData = utils.rows.getByTableId.getInfiniteData({
+        tableId,
+        limit: 500,
+        searchQuery,
+        sortConditions: mappedSortConditions,
+        filterConditions,
+      });
+
+      if (cachedData && tempColumnId) {
         const updatePromises: Promise<void>[] = [];
-        currentCacheData?.pages.forEach((page) => {
+        cachedData.pages.forEach((page) => {
           page.items.forEach((row) => {
             const realCell = row.cells.find(
               (cell) => cell.columnId === newColumn.id,

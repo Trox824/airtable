@@ -8,7 +8,6 @@ export function mapSortConditionsToAPI(
   conditions: SortCondition[] | undefined,
 ) {
   if (!conditions) return [];
-  console.log("conditions", conditions);
   return conditions.map((condition) => ({
     columnId: condition.columnId,
     order: condition.order,

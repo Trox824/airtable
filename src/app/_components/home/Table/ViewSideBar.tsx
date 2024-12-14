@@ -51,8 +51,8 @@ const ViewSideBar = ({
         id: tempId,
         name: newView.name,
         tableId: newView.tableId,
-        createdAt: null,
-        updatedAt: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
       };
 
       setOptimisticViews((old) => [...old, optimisticView]);

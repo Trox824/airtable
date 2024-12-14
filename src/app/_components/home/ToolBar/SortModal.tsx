@@ -4,7 +4,7 @@ import {
   LucideX,
   LucideSearch,
 } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { SimpleColumn, SortedColumn } from "../../../Types/types";
 import { api } from "~/trpc/react";
 import { type SortCondition } from "../../../Types/types";
@@ -34,9 +34,9 @@ export function SortModal({
   const [activeColumnSelection, setActiveColumnSelection] = useState<
     number | null
   >(null);
-  const [openDropdownIndex, setOpenDropdownIndex] = useState<number | null>(
-    null,
-  );
+  const [openDropdownIndex, setOpenDropdownIndex] = useState<
+    string | number | null
+  >(null);
 
   const utils = api.useUtils();
 
@@ -160,8 +160,14 @@ export function SortModal({
       </div>
       <div className="flex max-h-80 flex-col overflow-auto">
         {columns
-          ?.filter((column) =>
-            column.name.toLowerCase().includes(searchQuery.toLowerCase()),
+          ?.filter(
+            (column) =>
+              // Filter by search query
+              column.name.toLowerCase().includes(searchQuery.toLowerCase()) &&
+              // Filter out already selected columns
+              !sortConditions.some(
+                (condition) => condition.columnId === column.id,
+              ),
           )
           .map((column) => (
             <div
@@ -178,6 +184,25 @@ export function SortModal({
     </div>
   );
 
+  const modalRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (
+        modalRef.current &&
+        !modalRef.current.contains(event.target as Node)
+      ) {
+        setOpenDropdownIndex(null);
+        setIsSelectingColumn(false);
+      }
+    }
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, []);
+
   // Initial column selection view when no sort conditions exist
   if (sortConditions.length === 0) {
     return (
@@ -192,7 +217,10 @@ export function SortModal({
 
   // Sort conditions view with potential dropdown
   return (
-    <div className="absolute top-full z-40 mt-1 flex min-w-80 flex-col gap-y-3 rounded-sm border bg-white p-4 text-xs shadow-lg">
+    <div
+      ref={modalRef}
+      className="absolute top-full z-40 mt-1 flex min-w-80 flex-col gap-y-3 rounded-sm border bg-white p-4 text-xs shadow-lg"
+    >
       <div className="border-b pb-2 text-xs font-semibold text-gray-600">
         Sort by
       </div>
@@ -232,34 +260,76 @@ export function SortModal({
                   </div>
                 )}
               </div>
-              <select
-                className="flex w-28 items-center justify-between gap-x-2 rounded-sm border p-2 hover:bg-gray-100"
-                value={
-                  selectedColumn?.type === "Number"
-                    ? condition.order === "asc"
-                      ? "0-9"
-                      : "9-0"
-                    : condition.order
-                }
-                onChange={(e) =>
-                  handleSortOrderChange(
-                    index,
-                    e.target.value as "asc" | "desc" | "0-9" | "9-0",
-                  )
-                }
-              >
-                {selectedColumn?.type === "Number" ? (
-                  <>
-                    <option value="0-9">0-9</option>
-                    <option value="9-0">9-0</option>
-                  </>
-                ) : (
-                  <>
-                    <option value="asc">A-Z</option>
-                    <option value="desc">Z-A</option>
-                  </>
+              <div className="relative w-28">
+                <button
+                  className="flex w-full items-center justify-between gap-x-2 rounded-sm border p-2 hover:bg-gray-100"
+                  onClick={() =>
+                    setOpenDropdownIndex(
+                      index === openDropdownIndex ? null : `order-${index}`,
+                    )
+                  }
+                >
+                  <div>
+                    {selectedColumn?.type === "Number"
+                      ? condition.order === "asc"
+                        ? "0-9"
+                        : "9-0"
+                      : condition.order === "asc"
+                        ? "A-Z"
+                        : "Z-A"}
+                  </div>
+                  <LucideChevronDown size={16} />
+                </button>
+                {openDropdownIndex === `order-${index}` && (
+                  <div className="absolute left-0 top-full z-50 mt-1 w-full rounded-sm border bg-white shadow-lg">
+                    <div className="flex flex-col">
+                      {selectedColumn?.type === "Number" ? (
+                        <>
+                          <button
+                            className="flex items-center gap-x-2 rounded-sm p-2 hover:bg-gray-200/60"
+                            onClick={() => {
+                              handleSortOrderChange(index, "0-9");
+                              setOpenDropdownIndex(null);
+                            }}
+                          >
+                            0-9
+                          </button>
+                          <button
+                            className="flex items-center gap-x-2 rounded-sm p-2 hover:bg-gray-200/60"
+                            onClick={() => {
+                              handleSortOrderChange(index, "9-0");
+                              setOpenDropdownIndex(null);
+                            }}
+                          >
+                            9-0
+                          </button>
+                        </>
+                      ) : (
+                        <>
+                          <button
+                            className="flex items-center gap-x-2 rounded-sm p-2 hover:bg-gray-200/60"
+                            onClick={() => {
+                              handleSortOrderChange(index, "asc");
+                              setOpenDropdownIndex(null);
+                            }}
+                          >
+                            A-Z
+                          </button>
+                          <button
+                            className="flex items-center gap-x-2 rounded-sm p-2 hover:bg-gray-200/60"
+                            onClick={() => {
+                              handleSortOrderChange(index, "desc");
+                              setOpenDropdownIndex(null);
+                            }}
+                          >
+                            Z-A
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  </div>
                 )}
-              </select>
+              </div>
               <button
                 className="flex items-center gap-x-2 rounded-sm p-2 hover:bg-gray-100"
                 onClick={() => handleRemoveSort(index)}
