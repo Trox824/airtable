@@ -32,11 +32,7 @@ export function useAddColumnMutation(
       setIsTableCreating(true);
       await utils.columns.getByTableId.cancel({ tableId });
       const previousColumns = utils.columns.getByTableId.getData({ tableId });
-      console.log("Previous columns:", previousColumns);
-
       const tempColumnId = `temp_${cuid()}`;
-      console.log("Generated temp column ID:", tempColumnId);
-
       const existingRows = utils.rows.getByTableId.getInfiniteData({
         tableId,
         limit: 500,
@@ -44,7 +40,6 @@ export function useAddColumnMutation(
         sortConditions: mappedSortConditions,
         filterConditions,
       });
-      console.log("Existing rows:", existingRows);
 
       existingRows?.pages.forEach((page) => {
         page.items.forEach((row) => {
@@ -62,7 +57,6 @@ export function useAddColumnMutation(
             createdAt: new Date(),
             updatedAt: new Date(),
           };
-          console.log("Created temp cell for row:", row.id, tempCell);
 
           utils.rows.getByTableId.setInfiniteData(
             {
@@ -84,7 +78,7 @@ export function useAddColumnMutation(
                   ),
                 })),
               };
-              console.log("Updated cache data for row:", row.id, updatedData);
+
               return updatedData;
             },
           );
@@ -96,11 +90,10 @@ export function useAddColumnMutation(
         name: newColumn.name,
         type: newColumn.type,
       };
-      console.log("Created optimistic column:", optimisticColumn);
 
       utils.columns.getByTableId.setData({ tableId }, (oldColumns) => {
         const updatedColumns = [...(oldColumns ?? []), optimisticColumn];
-        console.log("Updated columns cache:", updatedColumns);
+
         return updatedColumns;
       });
 
@@ -108,8 +101,6 @@ export function useAddColumnMutation(
     },
 
     onSuccess: async (newColumn, variables, context) => {
-      console.log("onSuccess started with new column:", newColumn);
-      console.log("Context:", context);
       const { tempColumnId } = context;
 
       const currentCacheData = utils.rows.getByTableId.getInfiniteData({
@@ -119,7 +110,6 @@ export function useAddColumnMutation(
         sortConditions: mappedSortConditions,
         filterConditions,
       });
-      console.log("Current cache data:", currentCacheData);
 
       const tempCellValues = new Map<string, TempCellValues>();
       currentCacheData?.pages.forEach((page) => {

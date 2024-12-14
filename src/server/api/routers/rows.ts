@@ -237,10 +237,10 @@ export const rowsRouter = createTRPCRouter({
               paramsAdded++;
               break;
             case FilterOperator.IsEmpty:
-              condition = `${cAlias}."columnId" = $${paramIndex} AND ${cAlias}."valueText" = '' AND ${cAlias}."valueNumber" IS NULL`;
+              condition = `${cAlias}."columnId" = $${paramIndex} AND (${cAlias}."valueText" IS NULL OR ${cAlias}."valueText" = '')`;
               break;
             case FilterOperator.IsNotEmpty:
-              condition = `${cAlias}."columnId" = $${paramIndex} AND (${cAlias}."valueText" != '' OR ${cAlias}."valueNumber" IS NOT NULL)`;
+              condition = `${cAlias}."columnId" = $${paramIndex} AND ${cAlias}."valueText" IS NOT NULL AND ${cAlias}."valueText" != ''`;
               break;
             default:
               condition = "TRUE";
