@@ -84,9 +84,11 @@ export default function Toolbar({
   useEffect(() => {
     if (initialVisibility?.columnVisibility) {
       try {
-        const parsedVisibility = JSON.parse(
-          initialVisibility.columnVisibility as string,
-        ) as Record<string, boolean>;
+        // Check if the columnVisibility is already an object
+        const visibilityData: VisibilityState =
+          typeof initialVisibility.columnVisibility === "object"
+            ? (initialVisibility.columnVisibility as VisibilityState)
+            : {};
 
         // Type guard function to verify the parsed data
         const isValidVisibilityState = (
@@ -99,13 +101,16 @@ export default function Toolbar({
           );
         };
 
-        if (isValidVisibilityState(parsedVisibility)) {
-          onColumnVisibilityChange(parsedVisibility);
+        if (isValidVisibilityState(visibilityData)) {
+          onColumnVisibilityChange(visibilityData);
         } else {
-          console.error("Invalid visibility state format");
+          console.error("Invalid visibility state format:", visibilityData);
         }
       } catch (error) {
-        console.error("Failed to parse column visibility:", error);
+        console.error(
+          "Failed to parse column visibility:",
+          error instanceof Error ? error.message : "Unknown error",
+        );
       }
     }
   }, [initialVisibility, onColumnVisibilityChange]);

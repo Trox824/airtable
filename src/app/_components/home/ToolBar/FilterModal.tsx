@@ -138,7 +138,12 @@ const FilterModal: React.FC<FilterModalProps> = ({
     if (!column) return [];
 
     if (column.type === ColumnType.Text) {
-      return [FilterOperator.IsEmpty, FilterOperator.IsNotEmpty];
+      return [
+        FilterOperator.Contains,
+        FilterOperator.Equals,
+        FilterOperator.IsEmpty,
+        FilterOperator.IsNotEmpty,
+      ];
     }
 
     return [FilterOperator.GreaterThan, FilterOperator.SmallerThan];
@@ -149,11 +154,11 @@ const FilterModal: React.FC<FilterModalProps> = ({
     newSelectedColumns[index] = column;
     setSelectedColumns(newSelectedColumns);
 
-    // Reset operator and input when column changes
+    // Set default operator based on column type
     const newSelectedOperators = [...selectedOperators];
     newSelectedOperators[index] =
-      column && column.type === ColumnType.Text
-        ? FilterOperator.IsEmpty
+      column?.type === ColumnType.Text
+        ? FilterOperator.Contains
         : FilterOperator.GreaterThan;
     setSelectedOperators(newSelectedOperators);
 
@@ -229,9 +234,6 @@ const FilterModal: React.FC<FilterModalProps> = ({
           setInputValues(
             newConditions.map((condition) => condition.value ?? ""),
           );
-
-          // Add a new empty form after successful apply
-          handleAddFilterForm();
         },
         onError: () => {
           setFilterConditions(previousConditions);
@@ -330,7 +332,8 @@ const FilterModal: React.FC<FilterModalProps> = ({
             </div>
 
             {/* Input Field (only for applicable operators) */}
-            {selectedOperators[index] !== FilterOperator.IsEmpty &&
+            {selectedOperators[index] &&
+              selectedOperators[index] !== FilterOperator.IsEmpty &&
               selectedOperators[index] !== FilterOperator.IsNotEmpty && (
                 <input
                   className="w-32 border p-2"

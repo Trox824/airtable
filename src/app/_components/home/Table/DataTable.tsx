@@ -41,6 +41,8 @@ interface DataTableProps {
   setIsTableCreating: (isCreating: boolean) => void;
   columnVisibility: VisibilityState;
   onColumnVisibilityChange: OnChangeFn<VisibilityState>;
+  isCreatingWithFakeData: boolean;
+  setIsCreatingWithFakeData: (isCreating: boolean) => void;
 }
 
 const useTotalRowCount = (tableId: string, shouldRefetch: boolean) => {
@@ -74,6 +76,8 @@ export const DataTable = memo(
     setIsTableCreating,
     columnVisibility,
     onColumnVisibilityChange,
+    isCreatingWithFakeData,
+    setIsCreatingWithFakeData,
   }: DataTableProps) => {
     // State
     const [columnSizing, setColumnSizing] = useState<Record<string, number>>(
@@ -169,7 +173,7 @@ export const DataTable = memo(
     const handleFetchNextPage = useCallback(() => {
       void fetchNextPage();
     }, [fetchNextPage]);
-
+    console.log(rows);
     // Modify the virtualizer declaration to use the actual rows length when filtering or searching
     const virtualizer = useTableVirtualizer(
       tableContainerRef,
@@ -180,6 +184,7 @@ export const DataTable = memo(
       isFetchingNextPage,
       handleFetchNextPage,
     );
+    console.log(rows.length);
     const handleAddRow = useCallback(() => {
       incrementCount();
       addRow.mutate(
@@ -215,57 +220,98 @@ export const DataTable = memo(
       }
     }, [shouldRefetchCount, addRow.isPending]);
 
+    const renderTableContent = () => {
+      if (isCreatingWithFakeData) {
+        return (
+          <TableLoadingState
+            isLoading={true}
+            loadingMessage="Creating table with sample data..."
+          />
+        );
+      }
+
+      if (loadingRows) {
+        return (
+          <TableLoadingState
+            isLoading={true}
+            loadingMessage="Loading table data..."
+          />
+        );
+      }
+
+      if (!columns || columns.length === 0) {
+        return (
+          <TableLoadingState
+            isLoading={true}
+            emptyMessage="Data is Loading..."
+          />
+        );
+      }
+
+      if (rows.length === 0) {
+        return (
+          <TableLoadingState
+            isLoading={false}
+            emptyMessage="No data available. "
+          />
+        );
+      }
+
+      return (
+        <div className="flex h-full w-full flex-col">
+          <div className="flex h-full flex-col">
+            <div className="flex-none">
+              <table
+                className="w-full cursor-pointer border-r-0"
+                style={{ width: table.getCenterTotalSize() }}
+              >
+                <TableHeader
+                  table={table}
+                  isDropdownOpen={isDropdownOpen}
+                  buttonRef={buttonRef}
+                  onCreateColumn={handleCreateColumn}
+                  onRenameColumn={handleRenameColumn}
+                  setIsDropdownOpen={setIsDropdownOpen}
+                  sortedColumns={sortedColumns}
+                />
+              </table>
+            </div>
+            <div ref={tableContainerRef} className="flex-1 overflow-auto">
+              <table
+                className="relative w-full cursor-pointer border-r-0"
+                style={{
+                  width: table.getCenterTotalSize(),
+                  height: `${table.getTotalSize()}px`,
+                }}
+              >
+                <TableBody
+                  table={table}
+                  columns={memoizedTableColumns as ColumnDef<Row>[]}
+                  virtualizer={virtualizer}
+                  handleAddRow={handleAddRow}
+                  setEditing={setIsEditing}
+                  searchQuery={searchQuery}
+                  sortedColumns={sortedColumns}
+                  filterConditions={filterConditions}
+                  columnVisibility={columnVisibility}
+                />
+              </table>
+            </div>
+          </div>
+        </div>
+      );
+    };
+
     return (
       <>
         <div className="flex h-[calc(100vh-theme(spacing.navbar)-4.5rem-theme(spacing.toolbar))] flex-1 flex-col bg-[#f8f8f8]">
-          {rows.length === 0 || columns?.length === 0 ? (
-            <TableLoadingState loadingMessage={"Loading table..."} />
-          ) : (
-            <div className="flex h-full w-full flex-col">
-              <div className="flex h-full flex-col">
-                <div className="flex-none">
-                  <table
-                    className="w-full cursor-pointer border-r-0"
-                    style={{ width: table.getCenterTotalSize() }}
-                  >
-                    <TableHeader
-                      table={table}
-                      isDropdownOpen={isDropdownOpen}
-                      buttonRef={buttonRef}
-                      onCreateColumn={handleCreateColumn}
-                      onRenameColumn={handleRenameColumn}
-                      setIsDropdownOpen={setIsDropdownOpen}
-                      sortedColumns={sortedColumns}
-                    />
-                  </table>
-                </div>
-                <div ref={tableContainerRef} className="flex-1 overflow-auto">
-                  <table
-                    className="relative w-full cursor-pointer border-r-0"
-                    style={{
-                      width: table.getCenterTotalSize(),
-                      height: `${table.getTotalSize()}px`,
-                    }}
-                  >
-                    <TableBody
-                      table={table}
-                      columns={memoizedTableColumns as ColumnDef<Row>[]}
-                      virtualizer={virtualizer}
-                      handleAddRow={handleAddRow}
-                      setEditing={setIsEditing}
-                      searchQuery={searchQuery}
-                      sortedColumns={sortedColumns}
-                      filterConditions={filterConditions}
-                      columnVisibility={columnVisibility}
-                    />
-                  </table>
-                </div>
-              </div>
-            </div>
-          )}
+          {renderTableContent()}
         </div>
         <div className="fixed bottom-0 h-[40px] w-full border-t border-gray-300 bg-white p-2 text-xs text-gray-500">
-          {totalRowCount} records
+          {searchQuery || filterConditions.length > 0
+            ? rows.length
+            : totalRowCount}{" "}
+          records
         </div>
       </>
     );

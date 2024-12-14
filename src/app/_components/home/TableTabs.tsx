@@ -14,6 +14,9 @@ interface TableTabsProps {
   tableId: string;
   viewId: string;
   setIsTableCreating: (isCreating: boolean) => void;
+  isTableCreating: boolean;
+  isCreatingWithFakeData: boolean;
+  setIsCreatingWithFakeData: (isCreatingWithFakeData: boolean) => void;
 }
 
 interface TableWithCount {
@@ -35,6 +38,9 @@ export function TableTabs({
   tableId,
   viewId,
   setIsTableCreating,
+  isTableCreating,
+  isCreatingWithFakeData,
+  setIsCreatingWithFakeData,
 }: TableTabsProps) {
   const router = useRouter();
   const { data: tables = [], isLoading } = api.tables.getByBaseId.useQuery<
@@ -52,19 +58,18 @@ export function TableTabs({
 
   const createWithFakeData = api.tables.createWithDefaults.useMutation({
     onMutate: async (newTable) => {
-      setIsTableCreating(true);
+      setIsCreatingWithFakeData(true);
 
-      // Cancel outgoing refetches
+      await Promise.resolve();
+
       await utils.tables.getByBaseId.cancel({ baseId });
       await utils.columns.getByTableId.cancel();
 
       const previousTables = utils.tables.getByBaseId.getData({ baseId });
 
-      // Create temporary IDs
       const tempTableId = `temp-${uuidv4()}`;
       const tempViewId = `temp-${uuidv4()}`;
 
-      // Create optimistic table
       const optimisticTable: TableWithCount = {
         id: tempTableId,
         name: newTable.name,
@@ -76,21 +81,17 @@ export function TableTabs({
         },
       };
 
-      // Update tables list optimistically
       utils.tables.getByBaseId.setData({ baseId }, (old = []) => [
         ...(old ?? []),
         optimisticTable,
       ]);
 
-      // Set empty columns for temp table
       utils.columns.getByTableId.setData({ tableId: tempTableId }, []);
 
-      // Update UI state
       setSelectedTableId(tempTableId);
       setIsDropdownOpen(false);
       localStorage.setItem(`selectedTable-${baseId}`, tempTableId);
 
-      // Navigate to temp table
       router.push(`/${baseId}/${tempTableId}/${tempViewId}`, { scroll: false });
 
       return { previousTables, tempTableId, tempViewId };
@@ -99,7 +100,6 @@ export function TableTabs({
     onSuccess: (result, _, context) => {
       if (!context) return;
 
-      // Update with real data
       utils.tables.getByBaseId.setData({ baseId }, (old = []) =>
         (old ?? [])
           .filter((table) => table.id !== context.tempTableId)
@@ -115,20 +115,15 @@ export function TableTabs({
           }),
       );
 
-      // Update URL with real IDs
       setSelectedTableId(result.id);
       localStorage.setItem(`selectedTable-${baseId}`, result.id);
       router.replace(`/${baseId}/${result.id}/${result.views[0]?.id}`, {
         scroll: false,
       });
-
-      // Delay setting isTableCreating to false
-      setTimeout(() => {
-        setIsTableCreating(false);
-      }, 500);
     },
 
     onError: (error, _, context) => {
+      setIsCreatingWithFakeData(false);
       if (context?.previousTables) {
         utils.tables.getByBaseId.setData({ baseId }, context.previousTables);
         utils.columns.getByTableId.setData(
@@ -136,8 +131,10 @@ export function TableTabs({
           undefined,
         );
       }
-      setIsTableCreating(false);
       alert(`Error creating table with fake data: ${error.message}`);
+    },
+    onSettled: () => {
+      setIsCreatingWithFakeData(false);
     },
   });
 
@@ -145,18 +142,14 @@ export function TableTabs({
     onMutate: async (newTable) => {
       setIsTableCreating(true);
 
-      // Cancel any outgoing refetches
       await utils.tables.getByBaseId.cancel({ baseId });
       await utils.columns.getByTableId.cancel();
 
-      // Snapshot the previous value
       const previousTables = utils.tables.getByBaseId.getData({ baseId });
 
-      // Create temporary IDs
       const tempTableId = `temp-${uuidv4()}`;
       const tempViewId = `temp-${uuidv4()}`;
 
-      // Create an optimistic table with a default view
       const optimisticTable: TableWithCount = {
         id: tempTableId,
         name: newTable.name,
@@ -168,21 +161,17 @@ export function TableTabs({
         },
       };
 
-      // Optimistically update the tables list
       utils.tables.getByBaseId.setData({ baseId }, (old = []) => [
         ...(old ?? []),
         optimisticTable,
       ]);
 
-      // Set empty columns for the temp table
       utils.columns.getByTableId.setData({ tableId: tempTableId }, []);
 
-      // Update UI state immediately
       setSelectedTableId(tempTableId);
       setIsDropdownOpen(false);
       localStorage.setItem(`selectedTable-${baseId}`, tempTableId);
 
-      // Navigate to the new table
       router.push(`/${baseId}/${tempTableId}/${tempViewId}`, { scroll: false });
 
       return { previousTables, tempTableId, tempViewId };
@@ -191,7 +180,6 @@ export function TableTabs({
     onSuccess: (createdTable, _, context) => {
       if (!context) return;
 
-      // Update with real data while preserving the optimistic UI
       utils.tables.getByBaseId.setData({ baseId }, (old = []) =>
         (old ?? [])
           .filter((table) => table.id !== context.tempTableId)
@@ -207,7 +195,6 @@ export function TableTabs({
           }),
       );
 
-      // Update URL with real IDs
       setSelectedTableId(createdTable.id);
       localStorage.setItem(`selectedTable-${baseId}`, createdTable.id);
       router.replace(
@@ -217,7 +204,6 @@ export function TableTabs({
         },
       );
 
-      // Keep loading state until data is ready
       setTimeout(() => {
         setIsTableCreating(false);
       }, 500);
@@ -236,7 +222,6 @@ export function TableTabs({
     },
   });
 
-  // New useEffect to handle clicks outside the dropdown
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (
@@ -271,12 +256,9 @@ export function TableTabs({
     }
   };
 
-  // Modify this effect to filter out temporary tables and handle cache cleanup
   useEffect(() => {
-    // Filter out any temporary tables from the displayed list
     const validTables = tables.filter((table) => !table.id.startsWith("temp-"));
     const cachedTableId = localStorage.getItem(`selectedTable-${baseId}`);
-    // Only use cached ID if it exists in the current valid tables list
     if (
       cachedTableId &&
       validTables.some((table) => table.id === cachedTableId)
@@ -292,7 +274,6 @@ export function TableTabs({
     }
   }, [baseId, tables, tableId]);
 
-  // Combine the state initialization into a single useEffect
   useEffect(() => {
     setSelectedTableId(tableId);
     setSelectedViewId(viewId);
@@ -306,7 +287,6 @@ export function TableTabs({
     <div className="fixed left-0 right-0 top-navbar z-40 h-8 bg-teal-500 text-white">
       <div className="flex h-8 flex-row justify-between">
         <div className="flex w-full flex-row items-center overflow-scroll rounded-tr-lg bg-white [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-          {/* Active tab indicator */}
           <div
             className={`h-full w-3 ${
               tables.length > 1 && tables[0] && selectedTableId === tables[0].id

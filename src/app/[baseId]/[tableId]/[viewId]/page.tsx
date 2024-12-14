@@ -50,6 +50,7 @@ export default function TablePage() {
   const [openFilterModal, setOpenFilterModal] = useState(false);
   const [isTableCreating, setIsTableCreating] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [isCreatingWithFakeData, setIsCreatingWithFakeData] = useState(false);
 
   // 5. Table state
   const [sortConditions, setSortConditions] = useState<SortCondition[]>([]);
@@ -144,6 +145,7 @@ export default function TablePage() {
   );
 
   // 9. Render
+  useEffect(() => {}, [isCreatingWithFakeData]);
   return (
     <div className="relative">
       <TableTabs
@@ -151,6 +153,9 @@ export default function TablePage() {
         baseId={baseId as string}
         viewId={viewId as string}
         setIsTableCreating={setIsTableCreating}
+        isTableCreating={isTableCreating}
+        isCreatingWithFakeData={isCreatingWithFakeData}
+        setIsCreatingWithFakeData={setIsCreatingWithFakeData}
       />
       <Toolbar
         handleSearch={setSearchQuery}
@@ -196,6 +201,8 @@ export default function TablePage() {
             setIsTableCreating={setIsTableCreating}
             columnVisibility={columnVisibility}
             onColumnVisibilityChange={handleColumnVisibilityChange}
+            isCreatingWithFakeData={isCreatingWithFakeData}
+            setIsCreatingWithFakeData={setIsCreatingWithFakeData}
           />
         </div>
       </div>

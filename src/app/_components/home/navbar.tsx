@@ -2,17 +2,18 @@
 import Link from "next/link";
 import { api } from "~/trpc/react";
 import { useState } from "react";
-
+import { useSession } from "next-auth/react";
 interface NavbarProps {
   BaseId: string;
+  userImage?: string | null;
 }
 
-export function Navbar({ BaseId }: NavbarProps) {
+export function Navbar({ BaseId, userImage }: NavbarProps) {
   const isOptimistic = BaseId.startsWith("temp");
   const [newBaseName, setNewBaseName] = useState("newBaseName");
   const [isEditing, setIsEditing] = useState(false);
   const [optimisticName, setOptimisticName] = useState<string | null>(null);
-
+  const session = useSession();
   const utils = api.useContext();
   const updateBaseMutation = api.base.update.useMutation({
     onMutate: async ({ name }) => {
@@ -251,13 +252,11 @@ export function Navbar({ BaseId }: NavbarProps) {
               </svg>
             </div>
           </div>
-          <div className="ml-2 flex h-7 items-center justify-center">
+          <div className="ml-2 flex h-8 w-8 items-center justify-center overflow-hidden rounded-full bg-[#172B4D] text-white">
             <img
-              alt="Profile"
-              width="28"
-              height="28"
-              className="h-7 w-7 cursor-pointer rounded-full border-[0.8px] border-white"
-              src="/_next/image?url=https%3A%2F%2Flh3.googleusercontent.com%2Fa%2FACg8ocJBWlVosOkWx23ztU8OtChxKKDvhuSvtxpCJGpc12QE38OBIA%3Ds96-c&w=64&q=75"
+              src={session?.data?.user.image ?? ""}
+              alt={session?.data?.user.name ?? "User avatar"}
+              className="h-full w-full object-cover"
             />
           </div>
         </div>

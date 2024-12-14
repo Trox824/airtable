@@ -203,6 +203,12 @@ export const rowsRouter = createTRPCRouter({
       const params: (string | number)[] = [tableId];
       let paramIndex = 2; // $1 is tableId
 
+      // Fetch column types first for proper filter and sort handling
+      const columns = await ctx.db.column.findMany({
+        where: { tableId },
+        select: { id: true, type: true },
+      });
+
       // Base WHERE clause
       let whereClause = `WHERE r."tableId" = $1`;
 
@@ -210,6 +216,7 @@ export const rowsRouter = createTRPCRouter({
       if (filterConditions && filterConditions.length > 0) {
         filterConditions.forEach((filter, index) => {
           const { columnId, operator, value } = filter;
+          const column = columns.find((col) => col.id === columnId);
           const cAlias = `c_filter${index}`;
           params.push(columnId);
           let condition = "";
@@ -223,18 +230,39 @@ export const rowsRouter = createTRPCRouter({
               break;
             case FilterOperator.Equals:
               params.push(value ?? "");
-              condition = `${cAlias}."columnId" = $${paramIndex} AND (${cAlias}."valueText" = $${paramIndex + 1} OR ${cAlias}."valueNumber" = $${paramIndex + 1}::float)`;
+              if (column?.type === ColumnType.Number) {
+                const numValue = parseFloat(value ?? "");
+                if (!isNaN(numValue)) {
+                  condition = `${cAlias}."columnId" = $${paramIndex} AND ${cAlias}."valueNumber" = $${paramIndex + 1}::float`;
+                } else {
+                  condition = "FALSE";
+                }
+              } else {
+                condition = `${cAlias}."columnId" = $${paramIndex} AND ${cAlias}."valueText" = $${paramIndex + 1}`;
+              }
               paramsAdded++;
               break;
             case FilterOperator.GreaterThan:
-              params.push(parseNumber(value ?? undefined) ?? 0);
-              condition = `${cAlias}."columnId" = $${paramIndex} AND ${cAlias}."valueNumber" > $${paramIndex + 1}`;
-              paramsAdded++;
+              // Ensure we're dealing with numeric values and handle null cases
+              const gtValue = parseFloat(value ?? "");
+              if (!isNaN(gtValue)) {
+                params.push(gtValue);
+                condition = `${cAlias}."columnId" = $${paramIndex} AND ${cAlias}."valueNumber" IS NOT NULL AND ${cAlias}."valueNumber" > $${paramIndex + 1}`;
+                paramsAdded++;
+              } else {
+                condition = "FALSE"; // If the value isn't a valid number, no results should match
+              }
               break;
             case FilterOperator.SmallerThan:
-              params.push(parseNumber(value ?? undefined) ?? 0);
-              condition = `${cAlias}."columnId" = $${paramIndex} AND ${cAlias}."valueNumber" < $${paramIndex + 1}`;
-              paramsAdded++;
+              // Similar handling for SmallerThan
+              const ltValue = parseFloat(value ?? "");
+              if (!isNaN(ltValue)) {
+                params.push(ltValue);
+                condition = `${cAlias}."columnId" = $${paramIndex} AND ${cAlias}."valueNumber" IS NOT NULL AND ${cAlias}."valueNumber" < $${paramIndex + 1}`;
+                paramsAdded++;
+              } else {
+                condition = "FALSE";
+              }
               break;
             case FilterOperator.IsEmpty:
               condition = `${cAlias}."columnId" = $${paramIndex} AND (${cAlias}."valueText" IS NULL OR ${cAlias}."valueText" = '')`;
@@ -271,15 +299,9 @@ export const rowsRouter = createTRPCRouter({
       // Handle cursor for pagination: simplify by directly using r.id > cursor
       if (cursor) {
         params.push(cursor);
-        whereClause += ` AND r.id > $${paramIndex}`;
+        whereClause += ` AND (r.id > $${paramIndex} OR (r.id = $${paramIndex} AND r.id > r.id))`;
         paramIndex++;
       }
-
-      // Fetch column types first for proper sort handling
-      const columns = await ctx.db.column.findMany({
-        where: { tableId },
-        select: { id: true, type: true },
-      });
 
       // Handle sorting with type-aware conditions
       const joinClauses: string[] = [];
@@ -351,8 +373,8 @@ export const rowsRouter = createTRPCRouter({
 
         let nextCursor: string | undefined;
         if (rows.length > limit) {
-          const nextItem = rows.pop()!;
-          nextCursor = nextItem.id;
+          nextCursor = rows[limit - 1]?.id;
+          rows.length = limit;
         }
 
         const items: RowWithCells[] = rows.map((row) => ({

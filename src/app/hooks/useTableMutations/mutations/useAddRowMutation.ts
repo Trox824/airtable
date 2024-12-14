@@ -81,21 +81,22 @@ export function useAddRowMutation(
           }
 
           const newPages = [...oldData.pages];
-          if (newPages[0]) {
-            newPages[0] = {
-              ...newPages[0],
-              items: [...newPages[0].items, optimisticRow],
+          const lastPageIndex = newPages.length - 1;
+          if (lastPageIndex >= 0) {
+            newPages[lastPageIndex] = {
+              ...newPages[lastPageIndex],
+              items: [...(newPages[lastPageIndex]?.items ?? []), optimisticRow],
             };
 
             if (sortConditions.length > 0) {
               const sortedItems = sortRowsByConditions(
-                newPages[0].items,
+                newPages[lastPageIndex].items,
                 sortConditions,
                 columns,
               );
 
-              newPages[0] = {
-                ...newPages[0],
+              newPages[lastPageIndex] = {
+                ...newPages[lastPageIndex],
                 items: sortedItems,
               };
             }

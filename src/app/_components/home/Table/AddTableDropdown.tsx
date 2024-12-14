@@ -30,7 +30,7 @@ export function AddTableDropdown({
     left: number;
   }>({ top: 0, left: 0 });
   const [tableName, setTableName] = useState("");
-  const [rowCount, setRowCount] = useState(100);
+  const [rowCount, setRowCount] = useState("100");
 
   useEffect(() => {
     if (!isOpen || !buttonRef.current || !dropdownRef.current) return;
@@ -69,7 +69,7 @@ export function AddTableDropdown({
     createWithFakeData({
       name: tableName.trim(),
       baseId: baseId,
-      rowCount: rowCount,
+      rowCount: parseInt(rowCount),
     });
   };
   return (
@@ -97,6 +97,21 @@ export function AddTableDropdown({
             />
           </div>
 
+          <div className="mb-4">
+            <label className="mb-1 block text-sm font-medium text-gray-700">
+              Number of Rows
+            </label>
+            <div className="flex items-center space-x-2">
+              <input
+                type="text"
+                value={rowCount}
+                onChange={(e) => setRowCount(e.target.value)}
+                className="w-full rounded-sm border border-gray-300 px-3 py-2 text-sm text-gray-800 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+              />
+              <span className="text-xs text-gray-500">Max: 30,000</span>
+            </div>
+          </div>
+
           <div className="mb-4 flex flex-col space-y-2">
             <button
               type="submit"
@@ -106,59 +121,36 @@ export function AddTableDropdown({
               Add Empty Table
             </button>
             <div className="border-t border-gray-200"></div>
-
-            <div className="space-y-2">
-              <div className="flex items-center space-x-2">
-                <input
-                  type="number"
-                  value={rowCount}
-                  onChange={(e) =>
-                    setRowCount(
-                      Math.min(
-                        10000,
-                        Math.max(1, parseInt(e.target.value) || 1),
-                      ),
-                    )
-                  }
-                  min="1"
-                  max="10000"
-                  className="w-24 rounded-sm border border-gray-300 px-3 py-2 text-sm text-gray-800 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                />
-                <span className="text-xs text-gray-500">
-                  sample rows (max: 30,000)
+            <button
+              type="button"
+              onClick={handleAddFakeData}
+              disabled={!tableName.trim() || isCreatingWithFakeData}
+              className="w-full cursor-pointer rounded-sm bg-white p-2 text-center text-sm font-normal text-gray-700 hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {isCreatingWithFakeData ? (
+                <span className="flex items-center justify-center space-x-2">
+                  <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24">
+                    <circle
+                      className="opacity-25"
+                      cx="12"
+                      cy="12"
+                      r="10"
+                      stroke="currentColor"
+                      strokeWidth="4"
+                      fill="none"
+                    />
+                    <path
+                      className="opacity-75"
+                      fill="currentColor"
+                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                    />
+                  </svg>
+                  <span>Creating...</span>
                 </span>
-              </div>
-              <button
-                type="button"
-                onClick={handleAddFakeData}
-                disabled={!tableName.trim() || isCreatingWithFakeData}
-                className="w-full cursor-pointer rounded-sm bg-white p-2 text-center text-sm font-normal text-gray-700 hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                {isCreatingWithFakeData ? (
-                  <span className="flex items-center justify-center space-x-2">
-                    <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24">
-                      <circle
-                        className="opacity-25"
-                        cx="12"
-                        cy="12"
-                        r="10"
-                        stroke="currentColor"
-                        strokeWidth="4"
-                        fill="none"
-                      />
-                      <path
-                        className="opacity-75"
-                        fill="currentColor"
-                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                      />
-                    </svg>
-                    <span>Creating...</span>
-                  </span>
-                ) : (
-                  `Add Sample Rows`
-                )}
-              </button>
-            </div>
+              ) : (
+                `Add Sample Rows`
+              )}
+            </button>
           </div>
         </form>
       </div>

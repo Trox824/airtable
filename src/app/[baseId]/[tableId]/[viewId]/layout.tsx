@@ -1,7 +1,6 @@
 import React, { Suspense } from "react";
 import { Navbar } from "~/app/_components/home/navbar";
 import { NavbarSkeleton } from "~/app/loading/NavbarSkeleton";
-import { TableTabs } from "~/app/_components/home/TableTabs";
 interface LayoutProps {
   children: React.ReactNode;
   params: Promise<{
