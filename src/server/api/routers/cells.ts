@@ -152,4 +152,12 @@ export const cellsRouter = createTRPCRouter({
         });
       }
     }),
+
+  getByRowIdAndColumnId: publicProcedure
+    .input(z.object({ rowId: z.string(), columnId: z.string() }))
+    .query(async ({ ctx, input }) => {
+      return await ctx.db.cell.findFirst({
+        where: input,
+      });
+    }),
 });

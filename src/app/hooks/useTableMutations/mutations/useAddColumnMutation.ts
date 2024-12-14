@@ -5,6 +5,20 @@ import { mapSortConditionsToAPI } from "../utils";
 import { type Cell, type SimpleColumn } from "../../../Types/types";
 import { type ColumnType } from "@prisma/client";
 
+type CreateColumnResponse = {
+  column: {
+    id: string;
+    name: string;
+    type: ColumnType;
+  };
+  cells: {
+    id: string;
+    rowId: string;
+    valueText: string | null;
+    valueNumber: number | null;
+  }[];
+};
+
 export function useAddColumnMutation(
   props: TableMutationsProps & {
     utils: ReturnType<typeof api.useUtils>;
@@ -28,11 +42,12 @@ export function useAddColumnMutation(
       name: string;
       type: ColumnType;
     }) => {
-      console.log("Starting onMutate with newColumn:", newColumn);
       setIsTableCreating(true);
       await utils.columns.getByTableId.cancel({ tableId });
+
       const previousColumns = utils.columns.getByTableId.getData({ tableId });
       const tempColumnId = `temp_${cuid()}`;
+
       const existingRows = utils.rows.getByTableId.getInfiniteData({
         tableId,
         limit: 500,
@@ -41,49 +56,44 @@ export function useAddColumnMutation(
         filterConditions,
       });
 
-      existingRows?.pages.forEach((page) => {
-        page.items.forEach((row) => {
-          const tempCell: Cell = {
-            id: `temp_${cuid()}`,
-            valueText: null,
-            valueNumber: null,
-            column: {
-              type: newColumn.type,
-              id: tempColumnId,
-              name: newColumn.name,
-            },
-            columnId: tempColumnId,
-            rowId: row.id,
-            createdAt: new Date(),
-            updatedAt: new Date(),
-          };
-
-          utils.rows.getByTableId.setInfiniteData(
-            {
-              tableId,
-              limit: 500,
-              searchQuery,
-              sortConditions: mappedSortConditions,
-              filterConditions,
-            },
-            (oldData) => {
-              const updatedData = {
-                ...oldData!,
-                pages: oldData!.pages.map((page) => ({
-                  ...page,
-                  items: page.items.map((item) =>
-                    item.id === row.id
-                      ? { ...item, cells: [...item.cells, tempCell] }
-                      : item,
-                  ),
-                })),
-              };
-
-              return updatedData;
-            },
-          );
-        });
-      });
+      // Insert a temp column and cells optimistically
+      if (existingRows) {
+        utils.rows.getByTableId.setInfiniteData(
+          {
+            tableId,
+            limit: 500,
+            searchQuery,
+            sortConditions: mappedSortConditions,
+            filterConditions,
+          },
+          (oldData) => {
+            if (!oldData) return oldData;
+            return {
+              ...oldData,
+              pages: oldData.pages.map((page) => ({
+                ...page,
+                items: page.items.map((row) => {
+                  const tempCell: Cell = {
+                    id: `temp_${cuid()}`,
+                    valueText: null,
+                    valueNumber: null,
+                    column: {
+                      type: newColumn.type,
+                      id: tempColumnId,
+                      name: newColumn.name,
+                    },
+                    columnId: tempColumnId,
+                    rowId: row.id,
+                    createdAt: new Date(),
+                    updatedAt: new Date(),
+                  };
+                  return { ...row, cells: [...row.cells, tempCell] };
+                }),
+              })),
+            };
+          },
+        );
+      }
 
       const optimisticColumn: SimpleColumn = {
         id: tempColumnId,
@@ -93,16 +103,18 @@ export function useAddColumnMutation(
 
       utils.columns.getByTableId.setData({ tableId }, (oldColumns) => {
         const updatedColumns = [...(oldColumns ?? []), optimisticColumn];
-
         return updatedColumns;
       });
 
       return { previousColumns, tempColumnId };
     },
 
-    onSuccess: async (newColumn, variables, context) => {
+    // Adjust the `onSuccess` to handle the new response structure { column, cells }
+    onSuccess: async (data: CreateColumnResponse, variables, context) => {
+      const { column: newColumn, cells: newCells } = data;
       const { tempColumnId } = context;
 
+      // Extract tempCellValues from the current cache
       const currentCacheData = utils.rows.getByTableId.getInfiniteData({
         tableId,
         limit: 500,
@@ -126,6 +138,7 @@ export function useAddColumnMutation(
         });
       });
 
+      // Update the column ID in the cache from the temp ID to the real ID
       utils.columns.getByTableId.setData({ tableId }, (oldColumns) =>
         (oldColumns ?? []).map((col) =>
           col.id === tempColumnId
@@ -139,14 +152,7 @@ export function useAddColumnMutation(
         ),
       );
 
-      await utils.rows.getByTableId.invalidate({
-        tableId,
-        limit: 500,
-        searchQuery,
-        sortConditions: mappedSortConditions,
-        filterConditions,
-      });
-
+      // Replace tempColumnId in cells with the real newColumn.id
       utils.rows.getByTableId.setInfiniteData(
         {
           tableId,
@@ -161,30 +167,28 @@ export function useAddColumnMutation(
             ...oldData,
             pages: oldData.pages.map((page) => ({
               ...page,
-              items: page.items.map((row) => {
-                const tempValues = tempCellValues.get(row.id);
-                if (!tempValues) return row;
-
-                return {
-                  ...row,
-                  cells: row.cells.map((cell) => {
-                    if (cell.columnId === newColumn.id) {
-                      return {
+              items: page.items.map((row) => ({
+                ...row,
+                cells: row.cells.map((cell) =>
+                  cell.columnId === tempColumnId
+                    ? {
                         ...cell,
-                        valueText: tempValues.valueText,
-                        valueNumber: tempValues.valueNumber,
-                      };
-                    }
-                    return cell;
-                  }),
-                };
-              }),
+                        columnId: newColumn.id,
+                        column: { ...cell.column, id: newColumn.id },
+                      }
+                    : cell,
+                ),
+              })),
             })),
           };
         },
       );
 
-      const cachedData = utils.rows.getByTableId.getInfiniteData({
+      // Now that we have real column and real cells in the database, we can run updateCell
+      // to match the temp values we initially set.
+      // Map each row's temp values to the newly created real cell IDs from `newCells`.
+      const updatePromises: Promise<void>[] = [];
+      const finalCacheData = utils.rows.getByTableId.getInfiniteData({
         tableId,
         limit: 500,
         searchQuery,
@@ -192,21 +196,37 @@ export function useAddColumnMutation(
         filterConditions,
       });
 
-      if (cachedData && tempColumnId) {
-        const updatePromises: Promise<void>[] = [];
-        cachedData.pages.forEach((page) => {
+      if (finalCacheData) {
+        finalCacheData.pages.forEach((page) => {
           page.items.forEach((row) => {
-            const realCell = row.cells.find(
-              (cell) => cell.columnId === newColumn.id,
+            const tempValues = tempCellValues.get(row.id);
+            if (!tempValues) return;
+
+            // Find the corresponding newly created cell in `newCells` (from the server)
+            const realCellFromServer = newCells.find(
+              (c) =>
+                c.rowId === row.id &&
+                c.valueText === null &&
+                c.valueNumber === null,
             );
-            if (realCell && !realCell.id.startsWith("temp_")) {
+
+            if (!realCellFromServer) return;
+
+            // If there is a difference between tempValues and the actual cell data,
+            // call updateCell to sync backend.
+            const needsUpdate =
+              tempValues.valueText !== realCellFromServer.valueText ||
+              tempValues.valueNumber !== realCellFromServer.valueNumber;
+
+            if (needsUpdate) {
               const updatePromise = updateCell
                 .mutateAsync({
-                  id: realCell.id,
-                  valueText: realCell.valueText,
-                  valueNumber: realCell.valueNumber,
+                  id: realCellFromServer.id,
+                  valueText: tempValues.valueText,
+                  valueNumber: tempValues.valueNumber,
                 })
                 .then(() => void 0);
+
               updatePromises.push(updatePromise);
             }
           });

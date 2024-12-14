@@ -19,7 +19,6 @@ interface TableBodyProps {
   sortedColumns: SortedColumn[];
   filterConditions: FilterCondition[];
   columnVisibility: Record<string, boolean>;
-  onRefetch?: () => Promise<void>;
 }
 
 const MemoizedCellRenderer = memo(CellRenderer);
@@ -34,7 +33,6 @@ export const TableBody = memo(function TableBody({
   sortedColumns,
   filterConditions,
   columnVisibility,
-  onRefetch,
 }: TableBodyProps) {
   const [mounted, setMounted] = useState(false);
 
@@ -67,11 +65,10 @@ export const TableBody = memo(function TableBody({
           setEditing={setEditing}
           meta={table.options.meta}
           searchQuery={searchQuery}
-          onCellUpdate={onRefetch}
         />
       );
     },
-    [searchQuery, setEditing, table.options.meta, mounted, onRefetch],
+    [searchQuery, setEditing, table.options.meta, mounted],
   );
 
   const virtualRows = virtualizer.getVirtualItems();

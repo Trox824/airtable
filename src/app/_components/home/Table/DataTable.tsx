@@ -140,12 +140,6 @@ export const DataTable = memo(
 
     // Update the memoized table columns to use the result instead of the hook
     const memoizedTableColumns = useMemo(() => tableColumns, [tableColumns]);
-
-    // Create a refetch handler
-    const handleRefetch = useCallback(async () => {
-      await refetch();
-    }, [refetch]);
-
     // Table configuration with memoized values
     const tableConfig = useTableConfig({
       rows: rows as Row[],
@@ -176,10 +170,11 @@ export const DataTable = memo(
       void fetchNextPage();
     }, [fetchNextPage]);
 
-    // Modify the virtualizer declaration to conditionally use different row counts
+    // Modify the virtualizer declaration to use the actual rows length when filtering or searching
     const virtualizer = useTableVirtualizer(
       tableContainerRef,
-      searchQuery ? rows.length : totalRowCount,
+      // Use actual rows.length when there are filters or search
+      searchQuery || filterConditions.length > 0 ? rows.length : totalRowCount,
       rows.length,
       hasNextPage,
       isFetchingNextPage,
@@ -262,7 +257,6 @@ export const DataTable = memo(
                       sortedColumns={sortedColumns}
                       filterConditions={filterConditions}
                       columnVisibility={columnVisibility}
-                      onRefetch={handleRefetch}
                     />
                   </table>
                 </div>

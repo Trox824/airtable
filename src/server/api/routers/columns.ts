@@ -1,16 +1,13 @@
+// columns.ts
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { createTRPCRouter, publicProcedure } from "~/server/api/trpc";
-import { ColumnType } from "@prisma/client";
-import { PrismaClient } from "@prisma/client";
-// Helper function to validate table existence
+import { ColumnType, PrismaClient } from "@prisma/client";
+
 const validateTable = async (db: PrismaClient, tableId: string) => {
   const table = await db.table.findUnique({
     where: { id: tableId },
-    select: {
-      id: true,
-      name: true,
-    },
+    select: { id: true, name: true },
   });
 
   if (!table) {
@@ -19,7 +16,7 @@ const validateTable = async (db: PrismaClient, tableId: string) => {
       message: "Table not found",
     });
   }
-  return table as { id: string; name: string };
+  return table;
 };
 
 export const columnsRouter = createTRPCRouter({
@@ -53,13 +50,24 @@ export const columnsRouter = createTRPCRouter({
           })),
         });
 
-        return column;
+        // Fetch the newly created cells to return them
+        const newCells = await tx.cell.findMany({
+          where: { columnId: column.id },
+          select: {
+            id: true,
+            rowId: true,
+            valueText: true,
+            valueNumber: true,
+          },
+        });
+
+        return { column, cells: newCells };
       });
     }),
 
   getByTableId: publicProcedure
     .input(z.object({ tableId: z.string() }))
-    .query(async ({ ctx, input }) => {
+    .query(({ ctx, input }) => {
       return ctx.db.column.findMany({
         where: { tableId: input.tableId },
         orderBy: { createdAt: "asc" },
@@ -78,7 +86,7 @@ export const columnsRouter = createTRPCRouter({
         name: z.string().min(1),
       }),
     )
-    .mutation(async ({ ctx, input }) => {
+    .mutation(({ ctx, input }) => {
       return ctx.db.column.update({
         where: { id: input.columnId },
         data: { name: input.name },

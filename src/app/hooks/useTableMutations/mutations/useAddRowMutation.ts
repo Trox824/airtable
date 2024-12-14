@@ -48,7 +48,7 @@ export function useAddRowMutation(
         tableId,
         cells: columns.map((column: SimpleColumn) => ({
           id: `temp_${cuid()}`,
-          valueText: null,
+          valueText: "",
           valueNumber: null,
           column: {
             type: column.type,
@@ -72,12 +72,8 @@ export function useAddRowMutation(
           sortConditions: mappedSortConditions,
           filterConditions,
         },
-
         (oldData) => {
           if (!oldData) {
-            console.log(
-              "No oldData found, creating new data with optimistic row.",
-            );
             return {
               pages: [{ items: [optimisticRow] }],
               pageParams: [],
@@ -105,13 +101,10 @@ export function useAddRowMutation(
             }
           }
 
-          const resultData = {
+          return {
             ...oldData,
             pages: newPages,
-            pageParams: oldData.pageParams,
           };
-
-          return resultData;
         },
       );
 
@@ -137,19 +130,34 @@ export function useAddRowMutation(
       }
 
       if (tempRow) {
-        const updatePromises = newRow.cells.map((newCell) => {
-          const tempCell = tempRow?.cells.find(
-            (cell) => cell.columnId === newCell.columnId,
+        const updatePromises = newRow.cells
+          .map((newCell) => {
+            const tempCell = tempRow?.cells.find(
+              (cell) => cell.columnId === newCell.columnId,
+            );
+            if (
+              tempCell &&
+              (tempCell.valueText !== "" || tempCell.valueNumber !== null)
+            ) {
+              return updateCell.mutateAsync({
+                id: newCell.id,
+                valueText: tempCell.valueText,
+                valueNumber: tempCell.valueNumber,
+              });
+            }
+            return null;
+          })
+          .filter(
+            (promise): promise is ReturnType<typeof updateCell.mutateAsync> =>
+              promise !== null,
           );
-          if (tempCell) {
-            return updateCell.mutate({
-              id: newCell.id,
-              valueText: tempCell.valueText,
-              valueNumber: tempCell.valueNumber,
-            });
-          }
-        });
-        await Promise.all(updatePromises);
+
+        try {
+          await Promise.all(updatePromises);
+        } catch (error) {
+          console.error("Error updating cells:", error);
+          toast.error("Failed to update some cell values");
+        }
       }
 
       utils.rows.getByTableId.setInfiniteData(
@@ -177,9 +185,8 @@ export function useAddRowMutation(
                       );
                       return {
                         ...newCell,
-                        valueText: tempCell?.valueText ?? newCell.valueText,
-                        valueNumber:
-                          tempCell?.valueNumber ?? newCell.valueNumber,
+                        valueText: tempCell?.valueText ?? "",
+                        valueNumber: tempCell?.valueNumber ?? null,
                       };
                     }),
                   };
