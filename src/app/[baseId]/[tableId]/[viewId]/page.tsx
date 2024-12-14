@@ -145,7 +145,7 @@ export default function TablePage() {
   );
 
   // 9. Render
-  useEffect(() => {}, [isCreatingWithFakeData]);
+
   return (
     <div className="relative">
       <TableTabs
