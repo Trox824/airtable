@@ -1,5 +1,5 @@
 // src/app/_components/home/ToolBar/HideModal.tsx
-import React, { useState } from "react";
+import React, { useState, useCallback } from "react";
 import {
   DragDropContext,
   Droppable,
@@ -30,10 +30,7 @@ export const Switch: React.FC<SwitchProps> = ({ checked, onCheckedChange }) => {
       type="button"
       role="switch"
       aria-checked={checked}
-      onClick={(e) => {
-        e.preventDefault();
-        onCheckedChange(checked);
-      }}
+      onClick={() => onCheckedChange(!checked)}
       className={`relative inline-flex h-2.5 w-4 items-center rounded-full transition-colors ${
         checked ? "bg-green-600" : "bg-gray-200"
       }`}
@@ -98,31 +95,24 @@ export const HideModal: React.FC<HideModalProps> = ({
     onColumnReorder(sourceIndex, destinationIndex);
   };
 
-  const handleToggleVisibility = async (
-    columnId: string,
-    newVisibility?: Record<string, boolean>,
-  ) => {
-    // Create the updated visibility state
-    const updatedVisibility = newVisibility ?? {
-      ...columnVisibility,
-      [columnId]: !columnVisibility[columnId],
-    };
+  const handleToggleVisibility = useCallback(
+    (columnId: string, newVisibility?: Record<string, boolean>) => {
+      if (columnId === "__ALL__" && newVisibility) {
+        onToggleVisibility("__ALL__", newVisibility);
+        return;
+      }
 
-    // Optimistically update the local state immediately
-    onToggleVisibility(columnId, updatedVisibility);
+      // Use the provided newVisibility if available, otherwise toggle the current state
+      const updatedVisibility = newVisibility ?? {
+        ...columnVisibility,
+        [columnId]: !columnVisibility[columnId],
+      };
 
-    // Debounced database update
-    try {
-      await updateColumnVisibility.mutateAsync({
-        viewId,
-        visibility: updatedVisibility,
-      });
-    } catch (error) {
-      console.error("Failed to save column visibility:", error);
-      // Revert local state on error
-      onToggleVisibility(columnId, columnVisibility);
-    }
-  };
+      // Update the visibility state
+      onToggleVisibility(columnId, updatedVisibility);
+    },
+    [columnVisibility, onToggleVisibility],
+  );
 
   return (
     <div className="absolute top-full mt-1 flex w-72 flex-col rounded-sm border bg-white px-4 shadow-lg">

@@ -85,10 +85,10 @@ export default function Toolbar({
     if (initialVisibility?.columnVisibility) {
       try {
         // Check if the columnVisibility is already an object
-        const visibilityData: VisibilityState =
-          typeof initialVisibility.columnVisibility === "object"
-            ? (initialVisibility.columnVisibility as VisibilityState)
-            : {};
+        const visibilityData =
+          typeof initialVisibility.columnVisibility === "string"
+            ? JSON.parse(initialVisibility.columnVisibility)
+            : initialVisibility.columnVisibility;
 
         // Type guard function to verify the parsed data
         const isValidVisibilityState = (

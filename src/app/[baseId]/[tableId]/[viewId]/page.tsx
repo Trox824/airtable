@@ -133,13 +133,11 @@ export default function TablePage() {
   }, []);
 
   const handleColumnVisibilityChange: OnChangeFn<VisibilityState> = useCallback(
-    (updaterOrValue) => {
-      const newVisibility =
-        typeof updaterOrValue === "function"
-          ? updaterOrValue(columnVisibility)
-          : updaterOrValue;
-
-      setColumnVisibility(newVisibility);
+    (updater) => {
+      setColumnVisibility((prev) => {
+        const next = typeof updater === "function" ? updater(prev) : updater;
+        return next;
+      });
     },
     [],
   );

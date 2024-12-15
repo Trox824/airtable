@@ -153,13 +153,6 @@ export const viewRouter = createTRPCRouter({
 
       // Use a transaction to ensure data consistency
       return await prisma.$transaction(async (tx) => {
-        // Delete existing column orders
-        await tx.columnOrder.deleteMany({
-          where: {
-            viewId: input.viewId,
-          },
-        });
-
         // Verify that all columns exist before creating orders
         const columns = await tx.column.findMany({
           where: {
@@ -175,16 +168,28 @@ export const viewRouter = createTRPCRouter({
           validColumnIds.has(col.id),
         );
 
-        // Create new column orders only for valid columns
-        if (validColumns.length > 0) {
-          await tx.columnOrder.createMany({
-            data: validColumns.map((column) => ({
+        // Instead of delete-then-create, use upsert for each column order
+        const upsertPromises = validColumns.map((column) =>
+          tx.columnOrder.upsert({
+            where: {
+              viewId_columnId: {
+                viewId: input.viewId,
+                columnId: column.id,
+              },
+            },
+            update: {
+              order: column.order,
+            },
+            create: {
               viewId: input.viewId,
               columnId: column.id,
               order: column.order,
-            })),
-          });
-        }
+            },
+          }),
+        );
+
+        // Execute all upserts
+        await Promise.all(upsertPromises);
 
         return {
           success: true,
