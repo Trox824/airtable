@@ -130,13 +130,17 @@ export function SortModal({
     setIsSelectingColumn(false);
     setActiveColumnSelection(null);
     setSearchQuery("");
+    setOpenDropdownIndex(null);
 
     // Save to database immediately when column is selected
     void updateSort.mutate({
       viewId,
       sorts: newConditions.map((condition) => ({
         columnId: condition.columnId,
-        direction: condition.order === "asc" ? "Ascending" : "Descending",
+        direction:
+          condition.order === "asc" || condition.order === "0-9"
+            ? "Ascending"
+            : "Descending",
       })),
     });
   };
@@ -240,11 +244,12 @@ export function SortModal({
               <div className="relative w-60">
                 <button
                   className="flex w-full items-center justify-between gap-x-2 rounded-sm border p-2 hover:bg-gray-100"
-                  onClick={() =>
+                  onClick={() => {
                     setOpenDropdownIndex(
                       openDropdownIndex === index ? null : index,
-                    )
-                  }
+                    );
+                    setActiveColumnSelection(index);
+                  }}
                 >
                   <div>{selectedColumn?.name ?? "Select Column"}</div>
                   <LucideChevronDown size={16} />
