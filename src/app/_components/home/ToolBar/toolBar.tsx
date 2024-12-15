@@ -83,34 +83,39 @@ export default function Toolbar({
   // Effect to initialize column visibility
   useEffect(() => {
     if (initialVisibility?.columnVisibility) {
+      let rawVisibility: unknown;
+
       try {
-        // Check if the columnVisibility is already an object
-        const visibilityData =
+        rawVisibility =
           typeof initialVisibility.columnVisibility === "string"
             ? JSON.parse(initialVisibility.columnVisibility)
             : initialVisibility.columnVisibility;
-
-        // Type guard function to verify the parsed data
-        const isValidVisibilityState = (
-          obj: unknown,
-        ): obj is VisibilityState => {
-          return (
-            obj !== null &&
-            typeof obj === "object" &&
-            Object.values(obj).every((value) => typeof value === "boolean")
-          );
-        };
-
-        if (isValidVisibilityState(visibilityData)) {
-          onColumnVisibilityChange(visibilityData);
-        } else {
-          console.error("Invalid visibility state format:", visibilityData);
-        }
       } catch (error) {
         console.error(
           "Failed to parse column visibility:",
           error instanceof Error ? error.message : "Unknown error",
         );
+        return;
+      }
+
+      // Validate that rawVisibility matches the VisibilityState shape
+      if (
+        rawVisibility &&
+        typeof rawVisibility === "object" &&
+        !Array.isArray(rawVisibility)
+      ) {
+        const entries = Object.entries(rawVisibility);
+        const isValidVisibilityState = entries.every(
+          ([, value]) => typeof value === "boolean",
+        );
+
+        if (isValidVisibilityState) {
+          onColumnVisibilityChange(rawVisibility as VisibilityState);
+        } else {
+          console.error("Invalid visibility state format:", rawVisibility);
+        }
+      } else {
+        console.error("Invalid visibility state format:", rawVisibility);
       }
     }
   }, [initialVisibility, onColumnVisibilityChange]);

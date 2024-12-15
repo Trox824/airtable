@@ -30,7 +30,7 @@ export const Switch: React.FC<SwitchProps> = ({ checked, onCheckedChange }) => {
       type="button"
       role="switch"
       aria-checked={checked}
-      onClick={() => onCheckedChange(!checked)}
+      onClick={() => onCheckedChange(checked)}
       className={`relative inline-flex h-2.5 w-4 items-center rounded-full transition-colors ${
         checked ? "bg-green-600" : "bg-gray-200"
       }`}
@@ -61,40 +61,6 @@ export const HideModal: React.FC<HideModalProps> = ({
     },
   });
 
-  if (!columns) return null;
-
-  const filteredColumns = columns.filter((column) =>
-    column.name.toLowerCase().includes(searchQuery.toLowerCase()),
-  );
-
-  const handleHideAll = async () => {
-    const newVisibility: Record<string, boolean> = {};
-    columns?.forEach((column) => {
-      newVisibility[column.id] = false;
-    });
-    await handleToggleVisibility("__ALL__", newVisibility);
-  };
-
-  const handleShowAll = async () => {
-    const newVisibility: Record<string, boolean> = {};
-    columns?.forEach((column) => {
-      newVisibility[column.id] = true;
-    });
-    await handleToggleVisibility("__ALL__", newVisibility);
-  };
-
-  const handleDragEnd = (result: DropResult) => {
-    if (!result.destination) return;
-
-    const sourceIndex = result.source.index;
-    const destinationIndex = result.destination.index;
-
-    if (sourceIndex === destinationIndex) return;
-
-    // Directly use the filtered indices since we're working with the visible list
-    onColumnReorder(sourceIndex, destinationIndex);
-  };
-
   const handleToggleVisibility = useCallback(
     (columnId: string, newVisibility?: Record<string, boolean>) => {
       if (columnId === "__ALL__" && newVisibility) {
@@ -113,6 +79,40 @@ export const HideModal: React.FC<HideModalProps> = ({
     },
     [columnVisibility, onToggleVisibility],
   );
+
+  if (!columns) return null;
+
+  const filteredColumns = columns.filter((column) =>
+    column.name.toLowerCase().includes(searchQuery.toLowerCase()),
+  );
+
+  const handleHideAll = () => {
+    const newVisibility: Record<string, boolean> = {};
+    columns?.forEach((column) => {
+      newVisibility[column.id] = false;
+    });
+    handleToggleVisibility("__ALL__", newVisibility);
+  };
+
+  const handleShowAll = () => {
+    const newVisibility: Record<string, boolean> = {};
+    columns?.forEach((column) => {
+      newVisibility[column.id] = true;
+    });
+    handleToggleVisibility("__ALL__", newVisibility);
+  };
+
+  const handleDragEnd = (result: DropResult) => {
+    if (!result.destination) return;
+
+    const sourceIndex = result.source.index;
+    const destinationIndex = result.destination.index;
+
+    if (sourceIndex === destinationIndex) return;
+
+    // Directly use the filtered indices since we're working with the visible list
+    onColumnReorder(sourceIndex, destinationIndex);
+  };
 
   return (
     <div className="absolute top-full mt-1 flex w-72 flex-col rounded-sm border bg-white px-4 shadow-lg">
