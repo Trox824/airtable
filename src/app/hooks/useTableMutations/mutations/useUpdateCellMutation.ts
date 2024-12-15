@@ -50,35 +50,23 @@ export function useUpdateCellMutation(
           (oldData) => {
             if (!oldData) return oldData;
 
-            const updatedPages = oldData.pages.map((page) => {
-              const updatedItems = page.items.map((row) => ({
-                ...row,
-                cells: row.cells.map((cell) =>
-                  cell.id === newCell.id
-                    ? {
-                        ...cell,
-                        valueText: newCell.valueText ?? cell.valueText,
-                        valueNumber: newCell.valueNumber ?? cell.valueNumber,
-                      }
-                    : cell,
-                ),
-              }));
-
-              const sortedItems = sortRowsByConditions(
-                updatedItems,
-                sortConditions,
-                columns,
-              );
-
-              return {
-                ...page,
-                items: sortedItems,
-              };
-            });
-
             return {
               ...oldData,
-              pages: updatedPages,
+              pages: oldData.pages.map((page) => ({
+                ...page,
+                items: page.items.map((row) => ({
+                  ...row,
+                  cells: row.cells.map((cell) =>
+                    cell.id === newCell.id
+                      ? {
+                          ...cell,
+                          valueText: newCell.valueText ?? cell.valueText,
+                          valueNumber: newCell.valueNumber ?? cell.valueNumber,
+                        }
+                      : cell,
+                  ),
+                })),
+              })),
             };
           },
         );

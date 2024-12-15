@@ -173,7 +173,7 @@ export const DataTable = memo(
     const handleFetchNextPage = useCallback(() => {
       void fetchNextPage();
     }, [fetchNextPage]);
-    console.log(rows);
+
     // Modify the virtualizer declaration to use the actual rows length when filtering or searching
     const virtualizer = useTableVirtualizer(
       tableContainerRef,
@@ -184,7 +184,7 @@ export const DataTable = memo(
       isFetchingNextPage,
       handleFetchNextPage,
     );
-    console.log(rows.length);
+
     const handleAddRow = useCallback(() => {
       incrementCount();
       addRow.mutate(

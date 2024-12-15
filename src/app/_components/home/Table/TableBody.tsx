@@ -102,11 +102,6 @@ export const TableBody = memo(function TableBody({
     handleAddRow();
   };
 
-  const measureElement = (element: HTMLElement | null) => {
-    console.log("Element height:", element?.offsetHeight);
-    virtualizer.measureElement(element);
-  };
-
   return (
     <tbody>
       {paddingTop > 0 && (
@@ -123,7 +118,7 @@ export const TableBody = memo(function TableBody({
           <tr
             key={virtualRow.key}
             data-index={virtualRow.index}
-            ref={measureElement}
+            ref={virtualizer.measureElement}
             className={`group flex h-8 transition-colors hover:bg-gray-100`}
             style={{
               position: "absolute",
@@ -181,29 +176,48 @@ export const TableBody = memo(function TableBody({
         </tr>
       )}
 
-      <tr
-        className="flex cursor-pointer border-b-[0.8px] border-r-[0.8px] bg-white hover:bg-[#f8f8f8]"
-        onClick={handleAddRowWithLogging}
-        style={{
-          width: table.getCenterTotalSize(),
-          backgroundColor: "white",
-          position: "absolute",
-          top: virtualizer.getTotalSize(),
-        }}
-      >
-        <td
-          className="flex items-center px-2"
-          style={{ width: table.getAllColumns()[0]?.getSize() }}
+      {filterConditions.length > 0 ? (
+        <tr
+          className="flex border-b-[0.8px] border-r-[0.8px] bg-white"
+          style={{
+            width: table.getCenterTotalSize(),
+            backgroundColor: "white",
+            position: "absolute",
+            top: virtualizer.getTotalSize(),
+          }}
         >
-          <button className="text-gray-600 hover:text-gray-800">+</button>
-        </td>
-        {table
-          .getAllColumns()
-          .slice(1)
-          .map((column) => (
-            <td key={column.id} style={{ width: column.getSize() }} />
-          ))}
-      </tr>
+          <td
+            colSpan={columns.length}
+            className="flex w-full items-center justify-center py-2 text-sm italic text-gray-500"
+          >
+            Cannot add new rows while filters are active
+          </td>
+        </tr>
+      ) : (
+        <tr
+          className="flex cursor-pointer border-b-[0.8px] border-r-[0.8px] bg-white hover:bg-[#f8f8f8]"
+          onClick={handleAddRowWithLogging}
+          style={{
+            width: table.getCenterTotalSize(),
+            backgroundColor: "white",
+            position: "absolute",
+            top: virtualizer.getTotalSize(),
+          }}
+        >
+          <td
+            className="flex items-center px-2"
+            style={{ width: table.getAllColumns()[0]?.getSize() }}
+          >
+            <button className="text-gray-600 hover:text-gray-800">+</button>
+          </td>
+          {table
+            .getAllColumns()
+            .slice(1)
+            .map((column) => (
+              <td key={column.id} style={{ width: column.getSize() }} />
+            ))}
+        </tr>
+      )}
     </tbody>
   );
 });
