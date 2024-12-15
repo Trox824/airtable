@@ -102,6 +102,11 @@ export const TableBody = memo(function TableBody({
     handleAddRow();
   };
 
+  const measureElement = (element: HTMLElement | null) => {
+    console.log("Element height:", element?.offsetHeight);
+    virtualizer.measureElement(element);
+  };
+
   return (
     <tbody>
       {paddingTop > 0 && (
@@ -118,7 +123,7 @@ export const TableBody = memo(function TableBody({
           <tr
             key={virtualRow.key}
             data-index={virtualRow.index}
-            ref={virtualizer.measureElement}
+            ref={measureElement}
             className={`group flex h-8 transition-colors hover:bg-gray-100`}
             style={{
               position: "absolute",

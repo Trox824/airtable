@@ -373,8 +373,9 @@ export const rowsRouter = createTRPCRouter({
 
         let nextCursor: string | undefined;
         if (rows.length > limit) {
-          nextCursor = rows[limit - 1]?.id;
-          rows.length = limit;
+          const lastItem = rows[rows.length - 1];
+          nextCursor = lastItem?.id;
+          rows.length = limit; // Trim the array to the requested limit
         }
 
         const items: RowWithCells[] = rows.map((row) => ({
