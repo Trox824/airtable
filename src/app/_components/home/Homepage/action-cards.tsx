@@ -25,7 +25,7 @@ export const ActionCards: React.FC = () => {
             </h2>
           </div>
           <p className="mt-1">
-            Turn your process into an app with data and interfaces using AI.
+            Turn process into an app with data and interfaces using AI.
           </p>
         </div>
       </Link>
