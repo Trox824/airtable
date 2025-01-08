@@ -7,7 +7,7 @@
 
 # testing
 /coverage
-.shortest/
+
 # database
 /prisma/db.sqlite
 /prisma/db.sqlite-journal
