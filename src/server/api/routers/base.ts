@@ -3,7 +3,25 @@ import { createTRPCRouter, publicProcedure } from "../trpc";
 import { TRPCError } from "@trpc/server";
 import { authOptions } from "~/server/auth";
 import { getServerSession } from "next-auth";
-const validateSession = async () => {
+import type { Session } from "next-auth";
+import type { Context } from "~/server/api/trpc";
+
+// Define types for the return values
+type CreateBaseReturn = {
+  id: string;
+  name: string;
+  firstTableId: string;
+  firstViewId: string;
+  tables: Array<{
+    name: string;
+    views: Array<{
+      id: string;
+      name: string;
+    }>;
+  }>;
+};
+
+const validateSession = async (): Promise<Session> => {
   const session = await getServerSession(authOptions);
   if (!session) {
     throw new TRPCError({
@@ -11,13 +29,13 @@ const validateSession = async () => {
       message: "You must be logged in to access this resource",
     });
   }
-  return session;
+  return session as Session;
 };
 
 export const baseRouter = createTRPCRouter({
   create: publicProcedure
     .input(z.object({ name: z.string().min(1).max(50) }))
-    .mutation(async ({ ctx, input }) => {
+    .mutation(async ({ ctx, input }): Promise<CreateBaseReturn> => {
       const session = await validateSession();
 
       return ctx.db.$transaction(
@@ -45,7 +63,7 @@ export const baseRouter = createTRPCRouter({
           });
 
           // Create two columns
-          const columns = await tx.column.createMany({
+          await tx.column.createMany({
             data: [
               {
                 tableId: table.id,
@@ -88,7 +106,7 @@ export const baseRouter = createTRPCRouter({
           }
 
           // Create two rows
-          const rows = await tx.row.createMany({
+          await tx.row.createMany({
             data: [{ tableId: table.id }, { tableId: table.id }],
           });
 
@@ -134,30 +152,22 @@ export const baseRouter = createTRPCRouter({
     }),
 
   getAll: publicProcedure.query(async ({ ctx }) => {
-    try {
-      const session = await validateSession();
-      return await ctx.db.base.findMany({
-        where: { userId: session.user.id },
-        include: {
-          tables: {
-            include: {
-              views: {
-                select: {
-                  id: true,
-                  name: true,
-                },
+    const session = await validateSession();
+    return ctx.db.base.findMany({
+      where: { userId: session.user.id },
+      include: {
+        tables: {
+          include: {
+            views: {
+              select: {
+                id: true,
+                name: true,
               },
             },
           },
         },
-      });
-    } catch (error) {
-      throw new TRPCError({
-        code: "INTERNAL_SERVER_ERROR",
-        message: "Failed to fetch bases. Please check database connection.",
-        cause: error,
-      });
-    }
+      },
+    });
   }),
 
   delete: publicProcedure
@@ -183,18 +193,15 @@ export const baseRouter = createTRPCRouter({
         });
       }
 
-      // If checks pass, delete the base
       return ctx.db.base.delete({
         where: { id: input.id },
       });
     }),
 
-  // ... existing code ...
-
   fetchById: publicProcedure
     .input(z.object({ id: z.string() }))
     .query(async ({ ctx, input }) => {
-      const base = await ctx.db.base.findUnique({
+      return ctx.db.base.findUnique({
         where: { id: input.id },
         select: {
           id: true,
@@ -202,12 +209,12 @@ export const baseRouter = createTRPCRouter({
           userId: true,
         },
       });
-      return base;
     }),
 
   update: publicProcedure
     .input(z.object({ id: z.string(), name: z.string().min(1).max(50) }))
     .mutation(async ({ ctx, input }) => {
+      const session = await validateSession();
       return ctx.db.base.update({
         where: { id: input.id },
         data: { name: input.name },
