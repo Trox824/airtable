@@ -1,13 +1,12 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect } from "react";
 import { signIn, useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 
 export default function LoginPage() {
   const router = useRouter();
   const session = useSession();
-  const [errorMessage, setErrorMessage] = useState("");
 
   useEffect(() => {
     if (session.status === "authenticated") {
@@ -15,23 +14,6 @@ export default function LoginPage() {
     }
   }, [session, router]);
 
-  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    const formData = new FormData(event.currentTarget);
-    const email = formData.get("email") as string;
-    const password = formData.get("password") as string;
-
-    const result = await signIn("credentials", {
-      redirect: false,
-      email,
-      password,
-    });
-    if (result?.error) {
-      setErrorMessage("Invalid email or password");
-    } else {
-      router.push("/");
-    }
-  };
   const handleGoogleSignIn = async () => {
     try {
       await signIn("google");
@@ -58,35 +40,7 @@ export default function LoginPage() {
             create an account
           </a>
         </p>
-        {errorMessage && (
-          <div className="mt-4 w-80 rounded bg-red-100 p-2 text-red-700">
-            {errorMessage}
-          </div>
-        )}
-        <form className="mt-6 flex w-80 flex-col gap-4" onSubmit={handleSubmit}>
-          <input
-            type="email"
-            name="email"
-            placeholder="Email address"
-            className="w-full rounded-lg border p-3 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
-          />
-          <input
-            type="password"
-            name="password"
-            placeholder="Password"
-            className="w-full rounded-lg border p-3 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
-          />
-          <button
-            type="submit"
-            className="w-full rounded-lg bg-blue-500 py-3 text-white transition hover:bg-blue-600"
-          >
-            Continue
-          </button>
-          <div className="mt-4 flex items-center justify-between">
-            <hr className="w-full border-gray-300" />
-            <span className="px-2 text-gray-500">or</span>
-            <hr className="w-full border-gray-300" />
-          </div>
+        <div className="mt-6 flex w-80 flex-col gap-4">
           <button
             type="button"
             className="flex w-full items-center justify-center rounded-lg border border-gray-300 bg-white py-3 text-gray-700 transition hover:bg-gray-100"
@@ -99,7 +53,7 @@ export default function LoginPage() {
             />
             Sign in with Google
           </button>
-        </form>
+        </div>
       </div>
 
       {/* Right Side */}

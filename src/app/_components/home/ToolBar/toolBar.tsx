@@ -253,7 +253,7 @@ export default function Toolbar({
           <div>View</div>
         </button>
         <div>|</div>
-        <button className="flex cursor-pointer items-center gap-x-2 rounded-sm p-2 hover:bg-gray-200/60">
+        {/* <button className="flex cursor-pointer items-center gap-x-2 rounded-sm p-2 hover:bg-gray-200/60">
           <svg
             xmlns="http://www.w3.org/2000/svg"
             width="16"
@@ -271,7 +271,7 @@ export default function Toolbar({
             <path d="M12 3v18"></path>
           </svg>
           <div>Grid View</div>
-        </button>
+        </button> */}
 
         <div className="relative" ref={hideButtonRef}>
           <button
@@ -316,7 +316,7 @@ export default function Toolbar({
             />
           )}
         </div>
-        <button className="flex cursor-pointer items-center gap-x-2 rounded-sm p-2 hover:bg-gray-200/60">
+        {/* <button className="flex cursor-pointer items-center gap-x-2 rounded-sm p-2 hover:bg-gray-200/60">
           <svg
             xmlns="http://www.w3.org/2000/svg"
             width="16"
@@ -337,7 +337,7 @@ export default function Toolbar({
             <path d="M8 6h13"></path>
           </svg>
           <div>List</div>
-        </button>
+        </button> */}
         <div className="relative" ref={filterButtonRef}>
           <button
             onClick={() => setOpenFilterModal(true)}
@@ -380,7 +380,7 @@ export default function Toolbar({
             />
           )}
         </div>
-        <button className="flex cursor-pointer items-center gap-x-2 rounded-sm p-2 hover:bg-gray-200/60">
+        {/* <button className="flex cursor-pointer items-center gap-x-2 rounded-sm p-2 hover:bg-gray-200/60">
           <svg
             xmlns="http://www.w3.org/2000/svg"
             width="16"
@@ -401,7 +401,7 @@ export default function Toolbar({
             <rect width="7" height="5" x="10" y="12" rx="1"></rect>
           </svg>
           <div>Group</div>
-        </button>
+        </button> */}
         <div className="relative" ref={sortButtonRef}>
           <button
             onClick={() => setOpenSortModal(true)}
@@ -473,7 +473,7 @@ export default function Toolbar({
             />
           )}
         </div>
-        <button className="flex cursor-pointer items-center gap-x-2 rounded-sm p-2 hover:bg-gray-200/60">
+        {/* <button className="flex cursor-pointer items-center gap-x-2 rounded-sm p-2 hover:bg-gray-200/60">
           <svg
             xmlns="http://www.w3.org/2000/svg"
             width="16"
@@ -492,8 +492,8 @@ export default function Toolbar({
             <path d="M22 20a2 2 0 1 1-4 0c0-1.6 1.7-2.4 2-4 .3 1.6 2 2.4 2 4Z"></path>
           </svg>
           <div>Theme</div>
-        </button>
-        <button className="flex cursor-pointer items-center gap-x-2 rounded-sm p-2 hover:bg-gray-200/60">
+        </button> */}
+        {/* <button className="flex cursor-pointer items-center gap-x-2 rounded-sm p-2 hover:bg-gray-200/60">
           <svg
             xmlns="http://www.w3.org/2000/svg"
             width="15"
@@ -509,8 +509,8 @@ export default function Toolbar({
             ></path>
           </svg>
           <div>Sort List</div>
-        </button>
-        <button className="flex cursor-pointer items-center gap-x-2 rounded-sm p-2 hover:bg-gray-200/60">
+        </button> */}
+        {/* <button className="flex cursor-pointer items-center gap-x-2 rounded-sm p-2 hover:bg-gray-200/60">
           <svg
             xmlns="http://www.w3.org/2000/svg"
             width="16"
@@ -528,7 +528,7 @@ export default function Toolbar({
             <line x1="12" x2="12" y1="2" y2="15"></line>
           </svg>
           <div>Share</div>
-        </button>
+        </button> */}
       </div>
       <div className="relative">
         <button

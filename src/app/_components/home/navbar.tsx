@@ -174,7 +174,7 @@ export function Navbar({ BaseId, userImage }: NavbarProps) {
         {/* Navigation Links */}
         <nav className="flex items-center px-[15px]">
           <div className="flex h-auto flex-row">
-            {["Data", "Automations", "Interfaces"].map((item) => (
+            {["Data"].map((item) => (
               <div
                 key={item}
                 className={`mr-[8px] flex h-7 cursor-pointer flex-row items-center rounded-full px-3 text-black/65 ${item === "Data" ? "bg-black/10" : ""}`}
@@ -185,14 +185,14 @@ export function Navbar({ BaseId, userImage }: NavbarProps) {
               </div>
             ))}
           </div>
-          <div className="ml-[3px] h-5 border-r-[1px] border-white/10" />
+          {/* <div className="ml-[3px] h-5 border-r-[1px] border-white/10" />
           <div>
             <div className="mr-2 flex h-7 cursor-pointer flex-row items-center rounded-full px-6 text-black/65 hover:bg-black/10">
               <Link className="flex items-center" href="/">
                 <p className="text-[13px] text-white">Forms</p>
               </Link>
             </div>
-          </div>
+          </div> */}
         </nav>
 
         {/* Right section with icons and profile */}
@@ -253,11 +253,17 @@ export function Navbar({ BaseId, userImage }: NavbarProps) {
             </div>
           </div>
           <div className="ml-2 flex h-8 w-8 items-center justify-center overflow-hidden rounded-full bg-[#172B4D] text-white">
-            <img
-              src={session?.data?.user.image ?? ""}
-              alt={session?.data?.user.name ?? "User avatar"}
-              className="h-full w-full object-cover"
-            />
+            {userImage ? (
+              <img
+                src={userImage}
+                alt="User avatar"
+                className="h-full w-full object-cover"
+              />
+            ) : (
+              <span className="text-sm">
+                {(session.data?.user?.name?.[0] ?? session.data?.user?.email?.[0] ?? "?").toUpperCase()}
+              </span>
+            )}
           </div>
         </div>
       </div>
