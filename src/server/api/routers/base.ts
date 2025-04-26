@@ -4,7 +4,6 @@ import { TRPCError } from "@trpc/server";
 import { authOptions } from "~/server/auth";
 import { getServerSession } from "next-auth";
 import type { Session } from "next-auth";
-import type { Context } from "~/server/api/trpc";
 
 // Define types for the return values
 type CreateBaseReturn = {
@@ -29,7 +28,7 @@ const validateSession = async (): Promise<Session> => {
       message: "You must be logged in to access this resource",
     });
   }
-  return session as Session;
+  return session;
 };
 
 export const baseRouter = createTRPCRouter({
@@ -214,7 +213,7 @@ export const baseRouter = createTRPCRouter({
   update: publicProcedure
     .input(z.object({ id: z.string(), name: z.string().min(1).max(50) }))
     .mutation(async ({ ctx, input }) => {
-      const session = await validateSession();
+      await validateSession();
       return ctx.db.base.update({
         where: { id: input.id },
         data: { name: input.name },
